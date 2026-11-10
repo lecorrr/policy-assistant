@@ -1,4 +1,6 @@
-.env
+# Secrets: .env and any copy an editor may leave beside it, such as .env& or .env.bak.
+.env*
+!.env.example
 .venv/
 __pycache__/
 *.egg-info/

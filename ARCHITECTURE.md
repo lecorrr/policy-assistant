@@ -113,7 +113,8 @@ prompt-injection attempts.
   correctness, refusals, citation checks, numbers found in the excerpts, an optional judge for
   faithfulness, p50/p95 latency, tokens and cost per 1,000 questions. The judge is checked with
   one call before the first question, and judge failures are counted like answer errors.
-- `memo`: renders `docs/model-choice-memo.md` from the latest reports.
+- `memo`: renders `docs/model-choice-memo.md` from the latest reports and keeps those reports in
+  `docs/evals/`, so the evidence is committed with the memo while `data/` stays out of git.
 
 ## Recipes
 

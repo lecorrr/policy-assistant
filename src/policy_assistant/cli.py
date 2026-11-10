@@ -10,7 +10,7 @@
     serve            run the web page and the HTTP API
     eval-retrieval   recall@5 per search mode and the retrieval leak test
     eval-answers     answer quality, latency, cost and leaks per model
-    memo             write the model-choice memo from the latest reports
+    memo             write the model-choice memo, with the reports it uses beside it
     hash-password    print a password hash for config/users.yaml
 
 --fake swaps the embedder, the reranker and the answer model for deterministic stand-ins, so the
@@ -19,6 +19,7 @@ pipeline runs without Ollama, downloads or keys. The database is still the real 
 
 import argparse
 import getpass
+import json
 import logging
 import secrets
 import sys
@@ -380,11 +381,22 @@ def cmd_memo(args, context: Context) -> int:
     if not answers:
         print(f"error: no answer reports in {reports_dir}", file=sys.stderr)
         return 1
-    memo = render_memo(answers, latest_report(reports_dir, "retrieval"), context.models)
+    retrieval = latest_report(reports_dir, "retrieval")
+    memo = render_memo(answers, retrieval, context.models)
     out = args.out or MEMO_FILE
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(memo, encoding="utf-8")
+    # data/ stays out of git, so the reports behind the memo are kept next to it.
+    kept = {f"answers-{name}": report for name, report in answers.items()}
+    if retrieval is not None:
+        kept["retrieval"] = retrieval
+    evals_dir = out.parent / "evals"
+    evals_dir.mkdir(exist_ok=True)
+    for stem, report in kept.items():
+        text = json.dumps(report, ensure_ascii=False, indent=2) + "\n"
+        (evals_dir / f"{stem}.json").write_text(text, encoding="utf-8")
     print(f"Wrote {out} ({len(answers)} of {len(context.models.memo)} models)")
+    print(f"Kept the {len(kept)} reports it is based on in {evals_dir}")
     return 0
 
 

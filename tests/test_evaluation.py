@@ -416,6 +416,80 @@ def test_memo_table_and_recommendations(models):
     assert len(memo.splitlines()) < 45  # one page
 
 
+RETRIEVAL_MISSING_L08 = {
+    "modes": {"hybrid+rerank": {"recall_at_5": 0.98, "missed": ["L08"]}},
+    "leaks": {"checks": 265, "passed": True, "failures": []},
+}
+
+
+def with_cases(report: dict, wrong: list[str]) -> dict:
+    report["cases"] = [
+        {"id": qid, "kind": "question", "answered_answerable": False, "correct": False}
+        for qid in wrong
+    ] + [{"id": "S01", "kind": "question", "answered_answerable": True, "correct": True}]
+    return report
+
+
+def test_memo_calls_a_tie_a_tie_and_picks_everyday_by_speed(models):
+    # The shape of the first full run: all three 47 / 48, the same miss, search never found it.
+    reports = {
+        "local": with_cases(fake_report("local", 47 / 48, 14854, 0.0), ["L08"]),
+        "gpt-6-luna": with_cases(fake_report("gpt-6-luna", 47 / 48, 5371, 0.167), ["L08"]),
+        "claude-haiku-5-5": with_cases(
+            fake_report("claude-haiku-5-5", 47 / 48, 4032, 0.227), ["L08"]
+        ),
+    }
+    memo = render_memo(reports, RETRIEVAL_MISSING_L08, models)
+    assert "Everyday questions: **claude-haiku-5-5**" in memo
+    assert "Lowest running cost: **local**" in memo
+    assert "most accurate" not in memo
+    assert "no model is more accurate" in memo and "each got 47 right" in memo
+    assert "L08" in memo and "search did not find" in memo
+
+
+def test_memo_names_a_clear_winner_for_costly_questions(models):
+    reports = {
+        "local": fake_report("local", 40 / 48, 14854, 0.0),
+        "gpt-6-luna": fake_report("gpt-6-luna", 47 / 48, 5371, 0.167),
+        "claude-haiku-5-5": fake_report("claude-haiku-5-5", 43 / 48, 4032, 0.227),
+    }
+    memo = render_memo(reports, RETRIEVAL_MISSING_L08, models)
+    assert "a wrong answer is costly, such as the law: **gpt-6-luna**" in memo
+    assert "Everyday questions: **gpt-6-luna**" in memo  # the only one near the best
+
+
+def test_memo_everyday_pick_skips_a_fast_model_that_costs_too_much(models):
+    reports = {
+        "local": fake_report("local", 47 / 48, 14854, 0.0),
+        "gpt-6-luna": fake_report("gpt-6-luna", 47 / 48, 5371, 0.167),
+        "claude-haiku-5-5": fake_report("claude-haiku-5-5", 47 / 48, 4032, 5.0),
+    }
+    memo = render_memo(reports, RETRIEVAL_MISSING_L08, models)
+    assert "Everyday questions: **gpt-6-luna**" in memo
+
+
+def test_memo_command_keeps_the_reports_it_used_beside_the_memo(tmp_path, capsys):
+    reports = tmp_path / "reports"
+    for name, accuracy, p95, cost in [
+        ("local", 47 / 48, 14854, 0.0),
+        ("gpt-6-luna", 47 / 48, 5371, 0.167),
+        ("claude-haiku-5-5", 47 / 48, 4032, 0.227),
+    ]:
+        write_report(fake_report(name, accuracy, p95, cost), reports, f"answers-{name}")
+    write_report(RETRIEVAL_MISSING_L08, reports, "retrieval")
+    out = tmp_path / "docs" / "model-choice-memo.md"
+
+    assert cli.main(["memo", "--reports", str(reports), "--out", str(out)]) == 0
+    kept = sorted(path.name for path in (out.parent / "evals").iterdir())
+    assert kept == [
+        "answers-claude-haiku-5-5.json",
+        "answers-gpt-6-luna.json",
+        "answers-local.json",
+        "retrieval.json",
+    ]
+    assert "evals/" in out.read_text(encoding="utf-8")
+
+
 def test_memo_says_when_not_every_answer_was_judged(models):
     partial = fake_report("gpt-6-luna", 0.94, 2100, 0.36)
     partial["summary"].update(judged=45, judge_errors=2)

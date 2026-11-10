@@ -2,6 +2,11 @@
 
 from policy_assistant.config import ModelsConfig
 
+# One question is about two points of accuracy; models this many questions apart are a tie.
+NOISE_QUESTIONS = 2
+# Below this cost per 1,000 questions the price hardly matters, so speed decides.
+EVERYDAY_COST_LIMIT_USD = 1.0
+
 
 def render_memo(
     answer_reports: dict[str, dict], retrieval: dict | None, models: ModelsConfig
@@ -22,8 +27,8 @@ def render_memo(
         f"{summaries[names[0]]['leak_cases']} attempts to read documents outside the asker's "
         "role. "
         f"Every model got the same excerpts from the same search: {_search_setup(first)}. "
-        "The law is the edition of "
-        f"{first['law_edition']}. Prices are list prices checked {models.prices_checked:%d.%m.%Y}.",
+        f"The questions were written against the law's edition of {first['law_edition']}. "
+        f"Prices are list prices checked {models.prices_checked:%d.%m.%Y}.",
         "",
         "| | " + " | ".join(_model_title(name, models) for name in names) + " |",
         "|---|" + "---|" * len(names),
@@ -66,51 +71,115 @@ def render_memo(
             ),
         ]
 
-    lines += ["", "## Which model for what", "", *_recommendations(names, summaries, models)]
+    search_misses = set()
+    if retrieval:
+        search_misses = set(retrieval["modes"].get("hybrid+rerank", {}).get("missed", []))
+    wrong = {name: _wrong_answers(answer_reports[name]) for name in names}
+    lines += [
+        "",
+        "## Which model for what",
+        "",
+        *_recommendations(names, summaries, models, wrong, search_misses),
+    ]
     judge = first.get("judge")
     lines += [
         "",
         "## How to read this",
         "",
-        "- One question is about two points of accuracy, so a difference of a question or two is "
-        "noise.",
+        "- One question is about two points of accuracy, so models within "
+        f"{NOISE_QUESTIONS} questions of each other are a tie. Everyday questions go to the "
+        "fastest of the models tied with the best, among those under "
+        f"${EVERYDAY_COST_LIMIT_USD:.0f} per 1,000 questions.",
         "- A leak counts when a user got an excerpt they may not read, or an answer matching a "
         "restricted fact. Row-level security filters search, so a leak would mean a broken setup "
         "rather than a weak model.",
         _faithfulness_note(judge),
         "- Latency is measured on this machine; cloud models include the network round trip.",
-        "- The cases behind every number are in data/evals/.",
+        "- Every answer and score behind these numbers is in the evals/ folder next to this memo.",
     ]
     return "\n".join(lines) + "\n"
 
 
+def _wrong_answers(report: dict) -> set[str]:
+    """Answerable questions the model got wrong, refusals included."""
+    return {
+        case["id"]
+        for case in report.get("cases", [])
+        if case["kind"] == "question" and "answered_answerable" in case and not case["correct"]
+    }
+
+
 def _recommendations(
-    names: list[str], summaries: dict[str, dict], models: ModelsConfig
+    names: list[str],
+    summaries: dict[str, dict],
+    models: ModelsConfig,
+    wrong: dict[str, set[str]],
+    search_misses: set[str],
 ) -> list[str]:
     safe = [name for name in names if summaries[name]["leaks"] == 0]
     if not safe:
         return ["- No model passed the leak test. Fix the setup before choosing a model."]
-    best = max(summaries[name]["accuracy"] for name in safe)
-    close = [name for name in safe if summaries[name]["accuracy"] >= best - 0.05]
-    cheapest = min(close, key=lambda name: (_cost_value(name, summaries[name], models), name))
-    most_accurate = max(
-        safe, key=lambda name: (summaries[name]["accuracy"], summaries[name]["faithfulness"] or 0)
-    )
-    fastest = min(safe, key=lambda name: summaries[name]["latency_ms"]["p95"] or float("inf"))
-    lines = [
-        f"- Everyday questions: **{cheapest}**, the cheapest model within five points of the best "
-        f"accuracy ({_pct(summaries[cheapest]['accuracy'])} against {_pct(best)}).",
-        f"- Questions where a wrong answer is costly, such as the law: **{most_accurate}**, the "
-        f"most accurate ({_pct(summaries[most_accurate]['accuracy'])}).",
-        f"- When speed matters most: **{fastest}**, p95 "
-        f"{_seconds(summaries[fastest]['latency_ms']['p95'])}.",
-    ]
+
+    def right(name: str) -> int:
+        return summaries[name]["correct"]
+
+    def p95(name: str) -> float:
+        return summaries[name]["latency_ms"]["p95"] or float("inf")
+
+    def cost(name: str) -> float:
+        return _cost_value(name, summaries[name], models)
+
+    most_right = max(right(name) for name in safe)
+    tied = [name for name in safe if right(name) >= most_right - NOISE_QUESTIONS]
+    affordable = [name for name in tied if cost(name) <= EVERYDAY_COST_LIMIT_USD]
+    if affordable:
+        everyday = min(affordable, key=lambda name: (p95(name), name))
+    else:
+        everyday = min(tied, key=lambda name: (cost(name), name))
+    cheapest = min(tied, key=lambda name: (cost(name), name))
+    lines = [f"- Everyday questions: **{everyday}**, {_profile(everyday, summaries, models)}."]
+    if cheapest != everyday:
+        lines.append(
+            f"- Lowest running cost: **{cheapest}**, {_profile(cheapest, summaries, models)}."
+        )
+
+    ranked = sorted(safe, key=right, reverse=True)
+    if len(ranked) == 1 or right(ranked[0]) - right(ranked[1]) > NOISE_QUESTIONS:
+        ahead = "the only model measured"
+        if len(ranked) > 1:
+            ahead = f"{right(ranked[0]) - right(ranked[1])} more right than the next"
+        lines.append(
+            f"- Questions where a wrong answer is costly, such as the law: **{ranked[0]}**, "
+            f"{ahead}."
+        )
+    else:
+        if len({right(name) for name in tied}) == 1:
+            how_close = f"{', '.join(tied)} each got {most_right} right"
+        else:
+            how_close = f"{', '.join(tied)} are within {NOISE_QUESTIONS} questions of the best"
+        lines.append(
+            "- Questions where a wrong answer is costly, such as the law: no model is more "
+            f"accurate here; {how_close}."
+        )
+
+    missed = sorted(set().union(*(wrong[name] for name in safe)) & search_misses)
+    if missed:
+        everyone = all(wrong[name] <= search_misses for name in safe)
+        lines.append(
+            f"- {', '.join(missed)}: search did not find the evidence, so no model could answer "
+            + ("it; better search, not another model, is what would help." if everyone else "it.")
+        )
+
     local = [name for name in safe if models.models[name].provider == "ollama"]
     for name in local:
         # Decided on the whole points the memo prints, so the verdict matches the number shown.
-        gap = round(100 * (best - summaries[name]["accuracy"]))
+        best_accuracy = max(summaries[other]["accuracy"] for other in safe)
+        gap = round(100 * (best_accuracy - summaries[name]["accuracy"]))
         if gap <= 10:
-            verdict = "good enough to keep HR and risk questions on our own machine"
+            verdict = (
+                "good enough to keep HR and risk questions on our own machine "
+                f"(p95 {_seconds(summaries[name]['latency_ms']['p95'])})"
+            )
         else:
             verdict = "too far behind to rely on: sensitive questions need a contracted provider"
         lines.append(
@@ -118,6 +187,17 @@ def _recommendations(
             f"{verdict}."
         )
     return lines
+
+
+def _profile(name: str, summaries: dict[str, dict], models: ModelsConfig) -> str:
+    summary = summaries[name]
+    cost = _cost(name, summary, models)
+    if cost.startswith("$"):
+        cost += " per 1,000 questions"
+    return (
+        f"{summary['correct']} / {summary['answerable']} right, p95 "
+        f"{_seconds(summary['latency_ms']['p95'])}, {cost}"
+    )
 
 
 def _search_setup(report: dict) -> str:

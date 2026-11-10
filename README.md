@@ -161,7 +161,8 @@ Then the memo's three models and the faithfulness judge (Claude Sonnet 5.5), abo
 ```
 
 That writes [docs/model-choice-memo.md](docs/model-choice-memo.md) from the latest reports in
-`data/evals/`. What the numbers mean:
+`data/evals/`, and keeps the reports it used in `docs/evals/`, so they are committed with it
+(`data/` stays out of git). What the numbers mean:
 
 - **recall@5**: the share of the 48 answerable questions whose evidence sentence is in the five
   excerpts the model gets. Measured for vector only, full text only, both fused, and fused then
@@ -187,8 +188,53 @@ first.
 
 ### Results
 
-Not measured yet. After the first runs on the desktop, the tables from `eval-retrieval` and
-`eval-answers` go here, and the memo carries the comparison.
+Measured on 2026-11-10 on the desktop (Ryzen 9 7900X3D, RTX 4060 Ti 16 GB): search with
+v0.1.0, answers with v0.1.1 (the search code is the same in both), on the law's text as the
+Rada served it that day; `check-evals` found every question's evidence in it.
+
+Search, over the 48 answerable questions:
+
+| Mode | recall@5 | MRR | Missed |
+|---|---|---|---|
+| vector | 0.96 | 0.93 | L08, L10 |
+| lexical | 0.92 | 0.83 | L02, L08, L12, L15 |
+| hybrid | 0.96 | 0.93 | L08, L15 |
+| hybrid + rerank | 0.98 | 0.97 | L08 |
+
+The retrieval leak test ran 265 searches, every question as every user: no row outside the
+user's roles, and no leak user got a restricted source.
+
+Answers, with faithfulness judged by Claude Sonnet 5.5:
+
+| | gemma4:12b (local) | gpt-6-luna | claude-haiku-5-5 |
+|---|---|---|---|
+| Correct | 47 / 48 | 47 / 48 | 47 / 48 |
+| Faithful to the excerpts | 97 % (47 of 47 judged) | 98 % (48 of 48) | 98 % (47 of 47) |
+| Citations valid, numbers grounded | 100 %, 100 % | 100 %, 100 % | 100 %, 100 % |
+| No answer in the documents, refused | 2 / 2 | 2 / 2 | 2 / 2 |
+| Leaks, injections included | 0 / 53 | 0 / 53 | 0 / 53 |
+| Latency p50 / p95 | 10.9 s / 14.9 s | 3.8 s / 5.4 s | 2.9 s / 4.0 s |
+| Cost per 1,000 questions | no token cost | $0.17 | $0.23 |
+
+What it shows:
+
+- The three models tie on accuracy, and they miss the same question. L08 asks when collectors
+  may phone a debtor ("колектори", "телефонувати", "боржник"); the law says "колекторська
+  компанія", "взаємодіяти" and "споживач", so no search mode puts the passage in the top five,
+  and no model has anything to answer from. Better search, such as everyday synonyms or a
+  rewritten query, would fix it; another model would not. gpt-6-luna said in words that the
+  excerpts do not give the time instead of using the refusal marker, so its miss counts as a
+  wrong answer rather than a refusal; that is its 98 % on citing the right source.
+- Every leak test passed for every model, the three prompt injections included: the role
+  filter sits in Postgres, below the model.
+- In a few leak cases the user got an answer from a document they may read instead of a
+  refusal: asked whom to tell about suspected fraud, Olena (sales) got the security policy's
+  rule on reporting phishing. That is correct behaviour, not a leak. gemma4:12b did it more
+  often (P01, P08, R05) than the cloud models (R05 only).
+- What is left to choose on is speed: gemma4:12b answers in 11 to 15 seconds on the desktop,
+  Claude Haiku in 3 to 4, network included, at $0.23 per 1,000 questions. The memo
+  ([docs/model-choice-memo.md](docs/model-choice-memo.md)) therefore picks Claude Haiku for
+  everyday questions and keeps the local model for data that must not leave the company.
 
 ## If the download is refused
 

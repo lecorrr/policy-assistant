@@ -1,5 +1,24 @@
 # Changelog
 
+## 0.1.2 — 2026-11-11
+
+The first full measured run, and the memo rules it showed to be wrong.
+
+- Memo: on the first run all three models got 47 of 48 right, yet the memo named gpt-6-luna
+  "the most accurate" (the tie went to the first in the list) and sent everyday questions to
+  the local model for being cheapest, at 14.9 s p95 against 4.0 s. Now models within two
+  questions of each other are a tie and the memo says so; everyday questions go to the fastest
+  of the tied models among those under $1 per 1,000 questions, with the cheapest on a line of
+  its own; a costly-question pick needs a lead of more than two questions; and a question every
+  model missed because search never found its evidence is named as a search problem. The
+  memo now says which edition of the law the questions were written against, instead of
+  claiming that edition was the one indexed.
+- `memo` keeps the reports it used in `docs/evals/` beside the memo, so the evidence behind it
+  is committed with it; `data/` stays out of git.
+- `.gitignore` ignores `.env*` except `.env.example`, after an editor saved a copy of the secrets
+  as `.env&`, which the old `.env` rule did not cover.
+- README: the measured results.
+
 ## 0.1.1 — 2026-11-10
 
 - Fixed: a failing judge was hidden. With no Anthropic credit, a trial printed "faithfulness
