@@ -1,0 +1,169 @@
+:root {
+  --ink: #1d2433;
+  --muted: #5d6677;
+  --line: #d9dde5;
+  --accent: #1f5fbf;
+  --paper: #ffffff;
+  --wash: #f4f6f9;
+  --warn: #9a3412;
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  color: var(--ink);
+  background: var(--wash);
+}
+
+body {
+  margin: 0;
+}
+
+header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 1rem;
+  padding: 1rem 1.5rem;
+  background: var(--paper);
+  border-bottom: 1px solid var(--line);
+}
+
+h1 {
+  margin: 0;
+  font-size: 1.35rem;
+}
+
+h2 {
+  font-size: 1.1rem;
+}
+
+.note,
+.hint,
+.meta,
+.roles {
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+.note {
+  margin: 0.25rem 0 0;
+}
+
+main {
+  max-width: 52rem;
+  margin: 1.5rem auto;
+  padding: 0 1rem;
+}
+
+section,
+article {
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 1rem 1.25rem;
+}
+
+form label {
+  display: block;
+  margin-bottom: 0.75rem;
+}
+
+input,
+select,
+textarea {
+  font: inherit;
+  padding: 0.45rem 0.55rem;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+}
+
+#login-form input {
+  display: block;
+  width: 18rem;
+  margin-top: 0.25rem;
+}
+
+textarea {
+  display: block;
+  width: 100%;
+  box-sizing: border-box;
+  margin-top: 0.35rem;
+  resize: vertical;
+}
+
+.row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+}
+
+.row label {
+  margin: 0;
+}
+
+button {
+  font: inherit;
+  padding: 0.45rem 1.1rem;
+  color: #fff;
+  background: var(--accent);
+  border: 0;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+button:disabled {
+  opacity: 0.6;
+  cursor: wait;
+}
+
+button.link {
+  padding: 0;
+  margin-left: 0.5rem;
+  color: var(--accent);
+  background: none;
+}
+
+.error {
+  color: var(--warn);
+}
+
+article {
+  margin-top: 1rem;
+}
+
+#answer-text {
+  white-space: pre-wrap;
+  line-height: 1.55;
+}
+
+#answer-text.refused {
+  color: var(--muted);
+  font-style: italic;
+}
+
+sup a {
+  margin-left: 0.1rem;
+  color: var(--accent);
+  text-decoration: none;
+}
+
+#sources {
+  margin-top: 1rem;
+  padding-left: 1.5rem;
+  font-size: 0.92rem;
+}
+
+#sources li {
+  margin-bottom: 0.75rem;
+}
+
+blockquote {
+  margin: 0.35rem 0 0;
+  padding: 0.5rem 0.75rem;
+  white-space: pre-wrap;
+  background: var(--wash);
+  border-left: 3px solid var(--line);
+}
+
+details {
+  margin-top: 1rem;
+  color: var(--muted);
+}

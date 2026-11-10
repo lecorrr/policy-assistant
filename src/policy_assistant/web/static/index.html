@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="uk">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Асистент з політик · ДемоКредит</title>
+  <link rel="stylesheet" href="/static/style.css">
+  <script src="/static/app.js" defer></script>
+</head>
+<body>
+  <header>
+    <div>
+      <h1>Асистент з політик</h1>
+      <p class="note">ЗРАЗОК · вигадана компанія «ДемоКредит» · відповіді лише з документів, доступних вашій ролі</p>
+    </div>
+    <div id="whoami" hidden>
+      <span id="user-name"></span>
+      <span id="user-roles" class="roles"></span>
+      <button id="logout" type="button" class="link">Вийти</button>
+    </div>
+  </header>
+
+  <main>
+    <section id="login-view" hidden>
+      <h2>Вхід</h2>
+      <form id="login-form">
+        <label>Логін <input id="login" name="login" autocomplete="username" required></label>
+        <label>Пароль <input id="password" name="password" type="password" autocomplete="current-password" required></label>
+        <button type="submit">Увійти</button>
+        <p id="login-error" class="error" role="alert"></p>
+      </form>
+      <p class="hint">Демо-користувачі та їхні паролі наведені в README.</p>
+    </section>
+
+    <section id="ask-view" hidden>
+      <form id="ask-form">
+        <label for="question">Ваше питання</label>
+        <textarea id="question" rows="3" maxlength="1000" required
+          placeholder="Наприклад: скільки днів має клієнт, щоб відмовитися від кредитного договору?"></textarea>
+        <div class="row">
+          <label>Модель <select id="model"></select></label>
+          <button type="submit" id="ask-button">Запитати</button>
+        </div>
+      </form>
+      <p id="status" role="status"></p>
+
+      <article id="answer" hidden>
+        <div id="answer-text"></div>
+        <ol id="sources"></ol>
+        <p id="meta" class="meta"></p>
+      </article>
+
+      <details id="docs">
+        <summary>Документи, доступні вам</summary>
+        <ul id="doc-list"></ul>
+      </details>
+    </section>
+  </main>
+</body>
+</html>

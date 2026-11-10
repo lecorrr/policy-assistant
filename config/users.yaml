@@ -1,0 +1,36 @@
+# Roles and demo users. All people here are invented.
+#
+# roles lists every role a document or a user may name. Every user also has `staff`, the role
+# of documents meant for all employees. A user's roles decide which chunks search may return.
+#
+# The demo password of each user is "demo-" plus the login, e.g. demo-olena (see README).
+# For a real deployment replace the hashes: `policy-assistant hash-password` prints one.
+
+roles: [staff, sales, risk, hr]
+
+users:
+  olena:
+    name: Олена Савчук
+    title: менеджерка з продажу
+    roles: [sales]
+    password_hash: "scrypt$16384$8$1$4rZBkO-Bqzi4Hu-4mzjNaQ$FaRkHi9kqkNvZzPyAMQj3BaQ2SkKX2jlqXOum73SQiqibf3i7qD4XByYfr48sqhe6oxD4MqlZ7FbQM1gSocDyQ"
+  taras:
+    name: Тарас Мельник
+    title: ризик-аналітик
+    roles: [risk]
+    password_hash: "scrypt$16384$8$1$OsgUj0XWyIoJLdiv7uXJSg$L0CNppKrutmVernVXFiWJP_FJfJYk8iVIIWdMPT03CoGLd8WG5KlbCWKAj6UE4hfFkP33HtBl-RCrV-Ghxysdw"
+  iryna:
+    name: Ірина Бондар
+    title: HR-партнерка
+    roles: [hr]
+    password_hash: "scrypt$16384$8$1$bJ6pF8vppb8vOJiwSHNb4A$3LxqB4TNptxdqOP6RNW63ElFPSysi6S1jI53VascZQ4AcED1cq9sQf2jwqJbO5ynNkRnRFAT04aXsHq6XyyTSA"
+  andrii:
+    name: Андрій Кравець
+    title: фахівець служби підтримки
+    roles: []
+    password_hash: "scrypt$16384$8$1$_eqbRTEg_kQwP5pzRrOSfg$tq8Tx_iirJ0Oldt24S_WRtr4DQ2QVF5ZXvUY-klzTfcQBTYFp2MknDh-9c1VYh9_tyjpOvl55phu9CWzi_XAQw"
+  kateryna:
+    name: Катерина Литвин
+    title: керівниця роздрібного бізнесу
+    roles: [sales, risk]
+    password_hash: "scrypt$16384$8$1$gGTKcsXhzubMX6XRE1wZxQ$_-tG2KJ5EgZt1A97IdFKsJ-sewG2P5a6vnawPHkSbv0d51FO1kPWh5_Mrjh7E_fAA_wjxPG5T7Pr1u2Y1fGlmw"

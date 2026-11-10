@@ -1,0 +1,40 @@
+# Postgres with pgvector for the policy assistant, and optionally the app itself.
+#   docker compose up -d --wait db          the database only; the app runs from .venv
+#   docker compose --profile app up -d      the app too, built from this folder
+name: policy-assistant
+
+services:
+  db:
+    image: pgvector/pgvector:0.8.2-pg18
+    environment:
+      POSTGRES_DB: policy
+      POSTGRES_USER: policy_admin
+      POSTGRES_PASSWORD: ${POLICY_DB_ADMIN_PASSWORD:?run `policy-assistant setup` first}
+    # Only this machine can connect. 5442 rather than 5432, so it never clashes with another Postgres.
+    ports:
+      - "127.0.0.1:5442:5432"
+    volumes:
+      # Postgres 18 images keep their data in /var/lib/postgresql/18/docker, under this mount.
+      - db-data:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U policy_admin -d policy"]
+      interval: 5s
+      timeout: 3s
+      retries: 24
+    restart: unless-stopped
+
+  app:
+    profiles: [app]
+    build: .
+    env_file: .env
+    # The host network reaches Ollama and the database on 127.0.0.1 without exposing either.
+    network_mode: host
+    volumes:
+      - ./data:/app/data
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+
+volumes:
+  db-data:
