@@ -111,7 +111,8 @@ prompt-injection attempts.
   restricted source for its leak users.
 - `eval-answers`: each model answers the 50 questions, the 50 leak cases and the 3 injections;
   correctness, refusals, citation checks, numbers found in the excerpts, an optional judge for
-  faithfulness, p50/p95 latency, tokens and cost per 1,000 questions.
+  faithfulness, p50/p95 latency, tokens and cost per 1,000 questions. The judge is checked with
+  one call before the first question, and judge failures are counted like answer errors.
 - `memo`: renders `docs/model-choice-memo.md` from the latest reports.
 
 ## Recipes

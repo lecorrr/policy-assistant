@@ -3,6 +3,8 @@
 import pytest
 from conftest import CORPUS_DIR, MemoryStore, hit, law_text_path
 
+from policy_assistant import cli
+from policy_assistant.adapters.chat import Generation, ModelError
 from policy_assistant.config import Price
 from policy_assistant.contracts import Answer, Citation, Usage
 from policy_assistant.corpus import load_corpus
@@ -99,6 +101,9 @@ def test_facts_ignore_citations_case_and_separators():
     assert facts_match([r"28\s?000", r"38\s?000"], "Від 28 000 [1] до 38000 грн [2].")
     assert not facts_match([r"\b46\b"], "З 146 дня [1].")
     assert facts_match([r"hr-партнер"], "HR-партнер [3]")
+
+
+FREE = Price(input=0, output=0)
 
 
 def mini_set() -> EvalSet:
@@ -210,6 +215,65 @@ def test_answers_are_scored_and_leaks_detected(users):
     assert assistant.calls[0][1] == "Що таке споживчий кредит?"  # the unmeasured warm-up
 
 
+class ScriptedJudge:
+    """Finds every claim supported; fails like a provider when the message holds `fail_on`."""
+
+    name = "judge-model"
+
+    def __init__(self, fail_on: str | None = None, broken: bool = False) -> None:
+        self.fail_on, self.broken = fail_on, broken
+
+    def generate(self, system: str, message: str) -> Generation:
+        if self.broken or (self.fail_on and self.fail_on in message):
+            raise ModelError("judge-model failed: credit balance is too low")
+        verdict = '{"claims": [{"claim": "x", "supported": true}]}'
+        return Generation(text=verdict, usage=Usage(500, 50), elapsed_ms=10.0)
+
+
+def answering_assistant() -> ScriptedAssistant:
+    handbook = hit(
+        1, "staff-handbook", "Заяву подавайте щонайменше за 14 календарних днів.", ("staff",)
+    )
+    bands = hit(2, "hr-salary-bands", "G2: від 28 000 до 38 000 грн.", ("hr",))
+    return ScriptedAssistant(
+        answers={
+            "За скільки днів подати заяву на відпустку?": "Щонайменше за 14 календарних днів [1].",
+            "Який оклад менеджера з продажу G2?": "Від 28 000 до 38 000 грн [1].",
+        },
+        hits_for={"andrii": [handbook], "iryna": [bands], "olena": [handbook]},
+    )
+
+
+def test_a_judge_that_does_not_work_stops_the_run_before_any_question(users):
+    assistant = answering_assistant()
+    with pytest.raises(JudgeError, match=r"judge-model.*credit balance"):
+        evaluate_answers(
+            mini_set(), assistant, users, "m", price=FREE, judge=ScriptedJudge(broken=True)
+        )
+    assert assistant.calls == []
+
+
+def test_judge_failures_during_a_run_are_counted_and_shown(users, capsys):
+    lines = []
+    report = evaluate_answers(
+        mini_set(),
+        answering_assistant(),
+        users,
+        "m",
+        price=FREE,
+        judge=ScriptedJudge(fail_on="28 000"),  # judging the salary answer fails
+        progress=lines.append,
+    )
+    summary = report["summary"]
+    assert (summary["judged"], summary["answered"], summary["judge_errors"]) == (1, 2, 1)
+    assert summary["faithfulness"] == 1.0
+    assert any(line.startswith("H01") and "judge ERROR" in line for line in lines)
+
+    cli._print_summary("m", summary, judge=report["judge"])
+    out = capsys.readouterr().out
+    assert "1 of 2 judged" in out and "1 judge error" in out
+
+
 def test_ungrounded_numbers_are_flagged(users):
     eval_set = mini_set()
     eval_set.questions = eval_set.questions[:1]
@@ -268,9 +332,16 @@ def test_retrieval_eval_and_leak_test(lemmatizer, users):
     retriever = Retriever(
         store, HashingEmbedder(lemmatizer, 64), OverlapReranker(lemmatizer), lemmatizer
     )
-    report = evaluate_retrieval(mini_set(), retriever, users, ("lexical", "hybrid+rerank"))
+    lines = []
+    report = evaluate_retrieval(
+        mini_set(), retriever, users, ("lexical", "hybrid+rerank"), progress=lines.append
+    )
     assert report["modes"]["lexical"]["recall_at_5"] == 1.0
     assert report["leaks"]["passed"] and report["leaks"]["checks"] == 4 * len(users.users)
+    # A line per answerable question as it is searched, then one before the leak test.
+    assert [line.split()[0] for line in lines[:2]] == ["S01", "H01"]
+    assert "lexical 1" in lines[0] and "hybrid+rerank 1" in lines[0]
+    assert len(lines) == 3 and "leak test" in lines[2].lower()
 
 
 def test_leak_test_fails_when_a_leak_user_gets_the_source(lemmatizer, users):
@@ -307,7 +378,9 @@ def fake_report(
             "cites_source": 0.9,
             "numbers_grounded": 0.95,
             "faithfulness": 0.97,
+            "answered": 47,
             "judged": 47,
+            "judge_errors": 0,
             "leak_cases": 53,
             "leaks": leaks,
             "leak_refusals": 50,
@@ -341,6 +414,24 @@ def test_memo_table_and_recommendations(models):
     assert "**local** is 10 points behind the best, good enough" in memo
     assert "265 checks, none failed" in memo
     assert len(memo.splitlines()) < 45  # one page
+
+
+def test_memo_says_when_not_every_answer_was_judged(models):
+    partial = fake_report("gpt-6-luna", 0.94, 2100, 0.36)
+    partial["summary"].update(judged=45, judge_errors=2)
+    reports = {
+        "local": fake_report("local", 0.85, 6200, 0.0),
+        "gpt-6-luna": partial,
+        "claude-haiku-5-5": fake_report("claude-haiku-5-5", 0.96, 1800, 0.35),
+    }
+    retrieval = {
+        "modes": {"hybrid+rerank": {"recall_at_5": 0.96}},
+        "leaks": {"checks": 265, "passed": True, "failures": []},
+    }
+    memo = render_memo(reports, retrieval, models)
+    row = next(line for line in memo.splitlines() if line.startswith("| Faithful"))
+    assert "97 % (45 of 47 judged)" in row
+    assert row.count("judged") == 1  # complete judging shows just the share
 
 
 def test_memo_states_the_search_it_measured(models):

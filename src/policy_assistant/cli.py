@@ -53,6 +53,7 @@ from policy_assistant.doctor import run_doctor
 from policy_assistant.evaluation import QUESTIONS_FILE, latest_report, write_report
 from policy_assistant.evaluation.answers import EvaluationAborted, evaluate_answers
 from policy_assistant.evaluation.cases import EvalSetError, check_eval_set, load_eval_set
+from policy_assistant.evaluation.judge import JudgeError
 from policy_assistant.evaluation.memo import render_memo
 from policy_assistant.evaluation.retrieval import evaluate_retrieval
 from policy_assistant.search import MODES, AccessViolation
@@ -81,6 +82,7 @@ EXPECTED_ERRORS = (
     LawDownloadError,
     EvalSetError,
     EvaluationAborted,
+    JudgeError,
     AccessViolation,
     BadQuestion,
     UnknownModel,
@@ -288,9 +290,19 @@ def cmd_serve(args, context: Context) -> int:
 
 def cmd_eval_retrieval(args, context: Context) -> int:
     eval_set = load_eval_set(args.questions)
+    if not args.fake and context.settings.reranker != "none":
+        print(f"Loading {context.settings.reranker}; the first run downloads about 0.6 GB.")
     services = build_services(context, fake=args.fake, need_generators=False)
+    # A rank per mode for each question: '-' means its evidence was not in the top 5.
+    print(f"\nSearching {len(eval_set.answerable)} questions: {', '.join(args.modes)}", flush=True)
     try:
-        report = evaluate_retrieval(eval_set, services.retriever, context.users, tuple(args.modes))
+        report = evaluate_retrieval(
+            eval_set,
+            services.retriever,
+            context.users,
+            tuple(args.modes),
+            progress=lambda line: print(line, flush=True),
+        )
     finally:
         services.close()
     report.update(
@@ -301,7 +313,7 @@ def cmd_eval_retrieval(args, context: Context) -> int:
         fake=args.fake,
     )
     path = write_report(report, args.out or context.settings.reports_dir, "retrieval")
-    print(f"{'mode':15} {'recall@5':>9} {'MRR':>6}  missed")
+    print(f"\n{'mode':15} {'recall@5':>9} {'MRR':>6}  missed")
     for mode, row in report["modes"].items():
         missed = ", ".join(row["missed"]) or "-"
         print(f"{mode:15} {row['recall_at_5']:9.2f} {row['mrr']:6.2f}  {missed}")
@@ -346,9 +358,11 @@ def cmd_eval_answers(args, context: Context) -> int:
                 "top_k": services.retriever.top_k,
             }
             path = write_report(report, args.out or context.settings.reports_dir, f"answers-{name}")
-            _print_summary(name, report["summary"])
+            summary = report["summary"]
+            _print_summary(name, summary, judge=report["judge"])
             print(f"Report: {path}")
-            failed = failed or not report["summary"]["leak_test_passed"]
+            # An incomplete judgement is a failed measurement, like a leak.
+            failed = failed or not summary["leak_test_passed"] or summary["judge_errors"] > 0
     finally:
         services.close()
     return 1 if failed else 0
@@ -380,23 +394,34 @@ def _free():
     return Price(input=0, output=0)
 
 
-def _print_summary(name: str, summary: dict) -> None:
+def _print_summary(name: str, summary: dict, *, judge: str | None) -> None:
     latency = summary["latency_ms"]
-    faithfulness = summary["faithfulness"]
     cost = summary["cost_per_1000_questions_usd"]
     print(
         f"{name}: correct {summary['correct']}/{summary['answerable']}, refused "
         f"{summary['refused_unanswerable']}/{summary['unanswerable']} unanswerable, "
         f"{summary['false_refusals']} wrong refusals; citations valid "
         f"{summary['citations_valid']}, "
-        f"numbers grounded {summary['numbers_grounded']}, faithfulness "
-        f"{faithfulness if faithfulness is not None else 'not judged'}"
+        f"numbers grounded {summary['numbers_grounded']}, {_faithfulness_text(summary, judge)}"
     )
     print(
         f"  leaks {summary['leaks']}/{summary['leak_cases']} "
         f"({'PASSED' if summary['leak_test_passed'] else 'FAILED'}); p50 {latency['p50']} ms, "
         f"p95 {latency['p95']} ms; cost per 1,000 questions ${cost}; errors {summary['errors']}"
     )
+
+
+def _faithfulness_text(summary: dict, judge: str | None) -> str:
+    if judge is None:
+        return "faithfulness not judged"
+    text = (
+        f"faithfulness {summary['faithfulness']} by {judge} "
+        f"({summary['judged']} of {summary['answered']} judged"
+    )
+    errors = summary["judge_errors"]
+    if errors:
+        text += f", {errors} judge error{'' if errors == 1 else 's'}"
+    return text + ")"
 
 
 # --- arguments ---

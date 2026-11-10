@@ -32,7 +32,7 @@ def render_memo(
         ("Correct answers", lambda s: f"{s['correct']} / {s['answerable']}"),
         (
             "Faithful to the excerpts",
-            lambda s: _pct(s["faithfulness"]) if s["faithfulness"] is not None else "not judged",
+            _faithfulness_cell,
         ),
         ("Numbers found in the excerpts", lambda s: _pct(s["numbers_grounded"])),
         ("Cites the right source", lambda s: _pct(s["cites_source"])),
@@ -129,6 +129,17 @@ def _search_setup(report: dict) -> str:
         f"{setup['embedding_model']} vectors and full text, fused, {reranked}, "
         f"top {setup['top_k']} to the model"
     )
+
+
+def _faithfulness_cell(summary: dict) -> str:
+    # Reports from before 0.1.1 carry no judge counts, so their share is shown as it is.
+    answered, errors = summary.get("answered"), summary.get("judge_errors", 0)
+    if summary["faithfulness"] is None:
+        return f"judge failed on all {answered}" if errors else "not judged"
+    share = _pct(summary["faithfulness"])
+    if answered is not None and summary["judged"] < answered:
+        return f"{share} ({summary['judged']} of {answered} judged)"
+    return share
 
 
 def _faithfulness_note(judge: str | None) -> str:

@@ -1,5 +1,7 @@
 """Retrieval quality per search mode, and the retrieval leak test."""
 
+from collections.abc import Callable
+
 from policy_assistant.config import UsersConfig
 from policy_assistant.evaluation.cases import EvalSet
 from policy_assistant.search import MODES, AccessViolation, Retriever
@@ -8,7 +10,12 @@ K = 5
 
 
 def evaluate_retrieval(
-    eval_set: EvalSet, retriever: Retriever, users: UsersConfig, modes: tuple[str, ...] = MODES
+    eval_set: EvalSet,
+    retriever: Retriever,
+    users: UsersConfig,
+    modes: tuple[str, ...] = MODES,
+    *,
+    progress: Callable[[str], None] = lambda line: None,
 ) -> dict:
     """recall@5 is the share of answerable questions with their evidence in the top 5 excerpts;
     MRR averages 1 / rank of the first such excerpt (0 when it is missing)."""
@@ -29,6 +36,8 @@ def evaluate_retrieval(
             row["ranks"][mode] = rank
             row["top"][mode] = [hit.label for hit in result.hits]
         per_question.append(row)
+        ranks = "  ".join(f"{mode} {row['ranks'][mode] or '-'}" for mode in modes)
+        progress(f"{question.id}  {ranks}")
 
     summary = {}
     for mode in modes:
@@ -39,6 +48,8 @@ def evaluate_retrieval(
             "mrr": round(sum(1 / rank for rank in found) / len(ranks), 3),
             "missed": [row["id"] for row in per_question if row["ranks"][mode] is None],
         }
+    items = len(eval_set.questions) + len(eval_set.injections)
+    progress(f"Leak test: {items} questions as each of {len(users.users)} users...")
     return {
         "k": K,
         "modes": summary,

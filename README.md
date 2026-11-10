@@ -33,6 +33,13 @@ On the desktop (Ubuntu, Docker, Ollama, Python 3.14). Postgres listens on 127.0.
 cd ~/projects/policy-assistant
 ```
 
+The ROS 2 setup in `~/.bashrc` sets PYTHONPATH, which pip and pytest then see too; clear it in
+this terminal first:
+
+```bash
+unset PYTHONPATH
+```
+
 ```bash
 python3 -m venv .venv
 ```
@@ -136,7 +143,14 @@ Answers from the local model (about 105 questions, a few minutes):
 .venv/bin/policy-assistant eval-answers --models local --judge none
 ```
 
-With API keys in `.env`, the memo's three models and the faithfulness judge (Claude Sonnet 5.5):
+With API keys in `.env`, first a trial on two questions, written to its own folder so the memo
+never reads it. It costs a few cents and shows whether both keys, both models and the judge work:
+
+```bash
+.venv/bin/policy-assistant eval-answers --models gpt-6-luna,claude-haiku-5-5 --only L01,P01 --out data/trial
+```
+
+Then the memo's three models and the faithfulness judge (Claude Sonnet 5.5), about half an hour:
 
 ```bash
 .venv/bin/policy-assistant eval-answers
@@ -155,7 +169,10 @@ That writes [docs/model-choice-memo.md](docs/model-choice-memo.md) from the late
 - **Correct**: the answer matches every pattern the question lists (`evals/questions.yaml`).
   Refusing a question the documents answer counts as wrong.
 - **Faithful**: the share of the answer's claims that its excerpts support, judged by a model
-  stronger than the ones compared. **Numbers grounded** checks, without a judge, that every
+  stronger than the ones compared. The judge gets one test call before any model runs, so a
+  judge without credit stops the run at once; a judge call that fails later is shown as
+  `judge ERROR`, the summary and the memo say how many answers were judged, and the command
+  exits with 1. **Numbers grounded** checks, without a judge, that every
   figure in the answer appears in the excerpts.
 - **Leaks**: a leak case fails if the user got an excerpt of the restricted source or an answer
   matching all its facts. `eval-retrieval` also searches every question as every user and checks
@@ -163,8 +180,10 @@ That writes [docs/model-choice-memo.md](docs/model-choice-memo.md) from the late
 - **p95 latency**: question in, answer out, on this machine; nearest rank over the 50 questions.
 - **Cost per 1,000 questions**: the measured tokens at the list prices in `config/models.yaml`.
 
-A full run costs well under a dollar: a question is about 3,000 input tokens, so the cheap
-models cost about $0.0003 each, and judging 48 answers with Sonnet about $0.45.
+A full run costs about $1.50. A question is about 3,000 input tokens, so the two cheap models
+cost a few cents for all ~105 cases; the judge reads each model's 48 answers at about $0.45 per
+model, about $1.35 for three. Both APIs are prepaid: put a few dollars of credit on each account
+first.
 
 ### Results
 

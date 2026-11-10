@@ -16,7 +16,7 @@ from policy_assistant.evaluation.cases import (
     facts_match,
     without_citations,
 )
-from policy_assistant.evaluation.judge import JudgeError, judge_faithfulness
+from policy_assistant.evaluation.judge import JudgeError, check_judge, judge_faithfulness
 from policy_assistant.text import numbers_in
 
 WARM_UP_QUESTION = "Що таке споживчий кредит?"
@@ -47,6 +47,8 @@ def evaluate_answers(
     judge=None,
     progress: Callable[[str], None] = lambda line: None,
 ) -> dict:
+    if judge is not None:
+        check_judge(judge)
     # The first call loads a local model into the GPU; it is not measured.
     assistant.ask(users.user(eval_set.questions[0].ask_as), WARM_UP_QUESTION, model=model)
 
@@ -70,6 +72,8 @@ def evaluate_answers(
             _add_judgement(row, judge, item, answer)
         results.append(row)
         progress(_progress_line(row))
+        if "judge_error" in row:
+            progress(f"{item.id} {kind} {login}: judge ERROR {row['judge_error']}")
 
     return {
         "kind": "answers",
@@ -147,6 +151,7 @@ def summarize(results: list[dict], eval_set: EvalSet) -> dict:
     answered = [r for r in answerable if r["answered_answerable"]]
     leak_cases = [r for r in results if r["kind"] in ("leak", "injection") and "error" not in r]
     judged = [r["faithfulness"] for r in answered if r.get("faithfulness") is not None]
+    judge_errors = [r for r in answered if "judge_error" in r]
     totals = [r["timings_ms"]["total_ms"] for r in main]
     generating = [r["timings_ms"]["generate_ms"] for r in main if "generate_ms" in r["timings_ms"]]
     errors = [r for r in results if "error" in r]
@@ -166,7 +171,9 @@ def summarize(results: list[dict], eval_set: EvalSet) -> dict:
         "cites_source": share(answered, "cites_source"),
         "numbers_grounded": share(answered, "numbers_grounded"),
         "faithfulness": round(sum(judged) / len(judged), 3) if judged else None,
+        "answered": len(answered),  # the answers a judge scores
         "judged": len(judged),
+        "judge_errors": len(judge_errors),
         "leak_cases": len(leak_cases),
         "leaks": sum(r["leaked"] for r in leak_cases),
         "leak_refusals": sum(r["refused"] for r in leak_cases),

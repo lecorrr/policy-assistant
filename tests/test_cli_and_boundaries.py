@@ -7,7 +7,7 @@ import sys
 import pytest
 from conftest import SAMPLE_LAW, law_text_path
 
-from policy_assistant import cli
+from policy_assistant import __version__, cli
 from policy_assistant.config import PROJECT_ROOT
 
 
@@ -23,7 +23,7 @@ def test_every_command_has_a_handler():
 def test_version(capsys):
     with pytest.raises(SystemExit):
         cli.main(["--version"])
-    assert "policy-assistant 0.1.0" in capsys.readouterr().out
+    assert f"policy-assistant {__version__}" in capsys.readouterr().out
 
 
 def test_setup_adds_only_what_is_missing(tmp_path, monkeypatch, capsys):

@@ -5,6 +5,7 @@ import re
 
 from pydantic import BaseModel, ValidationError
 
+from policy_assistant.adapters.chat import ModelError
 from policy_assistant.contracts import Hit
 from policy_assistant.evaluation.cases import without_citations
 
@@ -60,3 +61,25 @@ def judge_faithfulness(
     """(score, generation) so the caller can count the judge's tokens."""
     generation = judge.generate(JUDGE_SYSTEM, judge_message(question, answer, hits))
     return parse_verdict(generation.text), generation
+
+
+_CHECK_EXCERPT = Hit(
+    chunk_id=0,
+    doc_id="check",
+    section="1",
+    label="Перевірка судді",
+    heading="Перевірка судді",
+    body="Щорічна оплачувана відпустка триває 14 календарних днів.",
+    roles=("staff",),
+    url=None,
+)
+
+
+def check_judge(judge) -> None:
+    """One cheap verdict before a run, so a judge without credit or access stops it at once."""
+    try:
+        judge_faithfulness(
+            judge, "Скільки триває відпустка?", "14 календарних днів [1].", [_CHECK_EXCERPT]
+        )
+    except (JudgeError, ModelError) as error:
+        raise JudgeError(f"the judge {judge.name} does not work: {error}") from error
