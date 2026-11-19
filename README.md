@@ -27,14 +27,14 @@ How it fits together is in [ARCHITECTURE.md](ARCHITECTURE.md).
 
 ## Set up
 
-On the desktop (Ubuntu, Docker, Ollama, Python 3.14). Postgres listens on 127.0.0.1:5442 only.
+Needs Linux with Docker, Ollama and Python 3.14. Postgres listens on 127.0.0.1:5442 only.
 
 ```bash
-cd ~/projects/policy-assistant
+git clone https://github.com/lecorrr/policy-assistant.git
+cd policy-assistant
 ```
 
-The ROS 2 setup in `~/.bashrc` sets PYTHONPATH, which pip and pytest then see too; clear it in
-this terminal first:
+If your shell sets PYTHONPATH, pip and pytest see it too; clear it first:
 
 ```bash
 unset PYTHONPATH
@@ -188,7 +188,7 @@ first.
 
 ### Results
 
-Measured on 2026-11-10 on the desktop (Ryzen 9 7900X3D, RTX 4060 Ti 16 GB): search with
+Measured on 2026-11-10 on a desktop with a Ryzen 9 7900X3D and an RTX 4060 Ti 16 GB: search with
 v0.1.0, answers with v0.1.1 (the search code is the same in both), on the law's text as the
 Rada served it that day; `check-evals` found every question's evidence in it.
 
@@ -231,7 +231,7 @@ What it shows:
   refusal: asked whom to tell about suspected fraud, Olena (sales) got the security policy's
   rule on reporting phishing. That is correct behaviour, not a leak. gemma4:12b did it more
   often (P01, P08, R05) than the cloud models (R05 only).
-- What is left to choose on is speed: gemma4:12b answers in 11 to 15 seconds on the desktop,
+- What is left to choose on is speed: gemma4:12b answers in 11 to 15 seconds on the RTX 4060 Ti,
   Claude Haiku in 3 to 4, network included, at $0.23 per 1,000 questions. The memo
   ([docs/model-choice-memo.md](docs/model-choice-memo.md)) therefore picks Claude Haiku for
   everyday questions and keeps the local model for data that must not leave the company.
@@ -250,8 +250,7 @@ The parser reads the website's form too ("Розділ III-1" instead of "Роз
 
 ## Tests
 
-The ROS 2 setup in `~/.bashrc` sets PYTHONPATH, which breaks pytest here; clear it in this
-terminal first:
+If your shell sets PYTHONPATH, clear it first:
 
 ```bash
 unset PYTHONPATH
