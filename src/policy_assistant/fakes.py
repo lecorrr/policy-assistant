@@ -1,10 +1,3 @@
-"""Stand-ins for the embedder, the reranker and the answer model.
-
-They need no GPU, no network and no downloads, and they are deterministic, so tests and
-`--fake` runs exercise the whole pipeline. Their quality is beside the point: the hashing embedder
-only knows which words two texts share.
-"""
-
 import hashlib
 import math
 import re
@@ -18,7 +11,7 @@ from policy_assistant.text import Lemmatizer
 
 
 class HashingEmbedder:
-    """Hashes each lemma into one of `dims` buckets and normalises the counts."""
+    """Hashes lemmas into `dims` buckets and normalises the counts."""
 
     model = "fake-hashing"
 
@@ -41,7 +34,7 @@ class HashingEmbedder:
 
 
 class OverlapReranker:
-    """Scores a passage by the share of the question's lemmas it contains."""
+    """Scores a passage by the share of question lemmas it contains."""
 
     name = "fake-overlap"
 
@@ -56,11 +49,7 @@ class OverlapReranker:
 
 
 class ExtractiveGenerator:
-    """Answers with the excerpt sentence that shares most lemmas with the question, cited.
-
-    Reads the excerpts back out of the prompt answering.build_user_message wrote. Refuses when no
-    sentence shares at least half of the question's lemmas.
-    """
+    """Answers with the excerpt sentence sharing most lemmas with the question."""
 
     def __init__(self, lemmatizer: Lemmatizer, name: str = "fake") -> None:
         self.name = name

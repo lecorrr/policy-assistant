@@ -1,5 +1,3 @@
-"""The retriever: one question, one user's roles, the best excerpts that user may read."""
-
 import time
 from collections import OrderedDict
 from collections.abc import Iterable, Sequence
@@ -14,11 +12,7 @@ MODES = ("vector", "lexical", "hybrid", "hybrid+rerank")
 
 
 class AccessViolation(RuntimeError):
-    """The database returned a row the user's roles do not cover.
-
-    Row-level security should make this impossible; it happens when the app connects as a role
-    that bypasses it, such as the admin. Searching stops rather than show the row.
-    """
+    """A row the user's roles don't cover; row-level security should make this impossible."""
 
 
 class Store(Protocol):

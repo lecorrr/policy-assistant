@@ -1,5 +1,3 @@
-"""The HTTP API and the page, on the in-memory store and the stand-in model."""
-
 import shutil
 import subprocess
 
@@ -34,7 +32,7 @@ def sign_in(client, login: str) -> None:
     assert response.status_code == 200, response.text
 
 
-def test_the_page_and_its_script_are_served_with_a_strict_policy(client):
+def test_page_and_script_are_served_with_strict_csp(client):
     page = client.get("/")
     assert page.status_code == 200 and "text/html" in page.headers["content-type"]
     assert 'id="ask-form"' in page.text and "/static/app.js" in page.text
@@ -45,25 +43,25 @@ def test_the_page_and_its_script_are_served_with_a_strict_policy(client):
 
 
 @pytest.mark.skipif(shutil.which("node") is None, reason="node is not installed")
-def test_the_script_parses():
+def test_script_parses():
     subprocess.run(["node", "--check", str(STATIC / "app.js")], check=True)
 
 
-def test_asking_needs_a_session(client):
+def test_asking_needs_session(client):
     assert client.get("/api/me").status_code == 401
     assert client.post("/api/ask", json={"question": "Що?"}).status_code == 401
     client.cookies.set(COOKIE, "olena.9999999999.forged-signature-forged-signature-forged-sig")
     assert client.get("/api/me").status_code == 401
 
 
-def test_wrong_password_and_unknown_login_look_the_same(client):
+def test_wrong_password_and_unknown_login_get_same_response(client):
     wrong = client.post("/api/login", json={"login": "olena", "password": "nope-nope"})
     unknown = client.post("/api/login", json={"login": "ghost", "password": "nope-nope"})
     assert wrong.status_code == unknown.status_code == 401
     assert wrong.json() == unknown.json()
 
 
-def test_sign_in_sets_a_strict_http_only_cookie_and_reports_roles(client):
+def test_sign_in_sets_strict_http_only_cookie_and_reports_roles(client):
     response = client.post("/api/login", json={"login": "kateryna", "password": "demo-kateryna"})
     cookie = response.headers["set-cookie"].lower()
     assert "httponly" in cookie and "samesite=strict" in cookie
@@ -85,7 +83,7 @@ def test_answers_come_with_citations(client):
     assert body["timings_ms"]["total_ms"] >= 0
 
 
-def test_a_sales_user_gets_nothing_from_hr(client, memory_store):
+def test_sales_user_gets_nothing_from_hr(client, memory_store):
     sign_in(client, "olena")
     body = client.post("/api/ask", json={"question": "Який оклад менеджера з продажу G2?"}).json()
     assert "28 000" not in str(body)
@@ -93,18 +91,18 @@ def test_a_sales_user_gets_nothing_from_hr(client, memory_store):
     assert searched == {("sales", "staff")}
 
 
-def test_the_request_cannot_choose_roles(client):
+def test_request_cannot_choose_roles(client):
     sign_in(client, "olena")
     response = client.post("/api/ask", json={"question": "Оклади?", "roles": ["hr"]})
     assert response.status_code == 422  # unknown fields are refused, not ignored
 
 
-def test_documents_list_only_what_the_user_may_read(client):
+def test_documents_list_only_what_user_may_read(client):
     sign_in(client, "andrii")
     assert [d["id"] for d in client.get("/api/documents").json()] == ["staff-handbook"]
 
 
-def test_logout_ends_the_session(client):
+def test_logout_ends_session(client):
     sign_in(client, "olena")
     client.post("/api/logout")
     assert client.get("/api/me").status_code == 401

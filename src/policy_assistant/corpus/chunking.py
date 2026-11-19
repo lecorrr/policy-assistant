@@ -1,11 +1,9 @@
-"""Splits documents into chunks of whole paragraphs, each citing one article or section."""
-
 import re
 
 from policy_assistant.contracts import Block, ChunkDraft, Document, Paragraph
 from policy_assistant.corpus.law import law_label
 
-# About 350 tokens of Ukrainian for bge-m3 and the reranker, which reads up to 512.
+# ~350 tokens of Ukrainian; the reranker reads up to 512.
 DEFAULT_MAX_CHARS = 1200
 
 _SENTENCE_END = re.compile(r"(?<=[.;:!?])\s+")
@@ -25,8 +23,7 @@ def chunk_document(document: Document, max_chars: int = DEFAULT_MAX_CHARS) -> li
         pieces = _pack(block.paragraphs, max_chars)
         labels = [_label(document, block, piece, whole=len(pieces) == 1) for piece in pieces]
         if len(set(labels)) < len(labels):
-            # Pieces of one long part or point would share a label; number them so a citation
-            # names exactly one.
+            # Number the pieces so each citation names exactly one.
             labels = [f"{label}, фрагмент {i}/{len(labels)}" for i, label in enumerate(labels, 1)]
         for piece, label in zip(pieces, labels, strict=True):
             chunks.append(
@@ -51,8 +48,7 @@ def _label(document: Document, block: Block, piece: list[Paragraph], *, whole: b
 
 
 def _pack(paragraphs: tuple[Paragraph, ...], max_chars: int) -> list[list[Paragraph]]:
-    """Groups paragraphs greedily into pieces of at most max_chars, splitting only paragraphs
-    that are longer than that on their own."""
+    """Pack paragraphs greedily into pieces of at most max_chars."""
     pieces: list[list[Paragraph]] = []
     current: list[Paragraph] = []
     size = 0
@@ -65,7 +61,7 @@ def _pack(paragraphs: tuple[Paragraph, ...], max_chars: int) -> list[list[Paragr
             current.append(piece)
             size += len(text) + 1
     if current:
-        # A short tail reads better as part of the piece before it.
+        # Merge a short tail into the previous piece.
         if pieces and size < max_chars // 4 and _size(pieces[-1]) + size <= max_chars * 1.3:
             pieces[-1].extend(current)
         else:

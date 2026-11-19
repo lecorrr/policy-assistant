@@ -1,16 +1,13 @@
-"""Reranking (question, passage) pairs with a cross-encoder through fastembed's ONNX runtime."""
-
 from collections.abc import Sequence
 from pathlib import Path
 
 
 class RerankerError(RuntimeError):
-    """The reranker model could not be loaded or run."""
+    pass
 
 
 class CrossEncoderReranker:
-    """Runs on the CPU. The model downloads from Hugging Face on first use (about 0.6 GB for the
-    int8 build of bge-reranker-v2-m3) into data/models and loads from there afterwards."""
+    """CPU cross-encoder; the model (~0.6 GB) downloads from Hugging Face on first use."""
 
     def __init__(self, model_name: str, cache_dir: Path, threads: int | None = None) -> None:
         from fastembed.rerank.cross_encoder import TextCrossEncoder
@@ -36,12 +33,12 @@ class CrossEncoderReranker:
             return [
                 float(score) for score in self._encoder.rerank(query, list(passages), batch_size=8)
             ]
-        except Exception as error:  # onnxruntime raises its own types; name the stage and fail
+        except Exception as error:  # onnxruntime raises its own exception types
             raise RerankerError(f"the reranker failed: {type(error).__name__}: {error}") from error
 
 
 class NoReranker:
-    """Keeps the fused order. For comparing with reranking, or a machine without the model."""
+    """Keeps the fused order (no reranking)."""
 
     name = "none"
 

@@ -1,10 +1,3 @@
-"""Shared fixtures.
-
-Database tests need a Postgres server with pgvector and set PA_TEST_DB=1; they then create a
-throwaway database and reader role with the admin account from the settings (.env), and drop
-both afterwards. Without PA_TEST_DB they are skipped.
-"""
-
 import os
 import secrets
 import textwrap
@@ -40,12 +33,11 @@ def models():
 
 
 def make_settings(**values) -> Settings:
-    """Settings that never read the developer's .env."""
     defaults = {"session_secret": "s" * 40}
     return Settings(_env_file=None, **(defaults | values))
 
 
-# --- an invented law in the official text's format ---
+# Invented law in the official text's format.
 
 SAMPLE_LAW = textwrap.dedent(
     """\
@@ -92,12 +84,10 @@ SAMPLE_LAW = textwrap.dedent(
 )
 
 
-# --- an in-memory store that filters by roles the way the database does ---
+# In-memory store that filters by roles like the database does.
 
 
 class MemoryStore:
-    """Holds hits and returns those whose roles overlap the user's, best word overlap first."""
-
     def __init__(self, hits: list[Hit], lemmatizer: Lemmatizer) -> None:
         self.hits = hits
         self._lemmatizer = lemmatizer
@@ -170,12 +160,11 @@ def memory_store(lemmatizer) -> MemoryStore:
     return MemoryStore(list(SAMPLE_HITS), lemmatizer)
 
 
-# --- a real database for the integration tests ---
+# Real database for the integration tests.
 
 
 @pytest.fixture(scope="session")
 def database():
-    """Connection strings and POLICY_ variables for a throwaway database, or a skip."""
     if os.environ.get("PA_TEST_DB") != "1":
         pytest.skip("set PA_TEST_DB=1 to run the database tests")
     settings = Settings()
@@ -189,7 +178,7 @@ def database():
     reader_dsn = make_conninfo(
         **(base | {"dbname": name, "user": reader, "password": reader_password})
     )
-    # The same database for commands, which build their connection strings from settings.
+    # Commands build their connection strings from settings.
     env = {
         "POLICY_DB_NAME": name,
         "POLICY_DB_READER_USER": reader,
@@ -206,6 +195,5 @@ def database():
 
 
 def law_text_path() -> Path | None:
-    """The downloaded law, if this machine has it (`fetch-law`)."""
     path = Settings(_env_file=None).law_file
     return path if path.is_file() else None

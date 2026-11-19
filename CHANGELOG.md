@@ -1,6 +1,11 @@
 # Changelog
 
-## 0.1.2 — 2026-11-11
+## 0.1.3 - 2026-11-19
+
+- Comments and docstrings cut down to the ones that explain why; clearer test names.
+  No change in behaviour.
+
+## 0.1.2 - 2026-11-11
 
 The first full measured run, and the memo rules it showed to be wrong.
 
@@ -19,7 +24,7 @@ The first full measured run, and the memo rules it showed to be wrong.
   as `.env&`, which the old `.env` rule did not cover.
 - README: the measured results.
 
-## 0.1.1 — 2026-11-10
+## 0.1.1 - 2026-11-10
 
 - Fixed: a failing judge was hidden. With no Anthropic credit, a trial printed "faithfulness
   not judged, errors 0" while every judge call had failed, and a judge failing on some answers
@@ -33,7 +38,7 @@ The first full measured run, and the memo rules it showed to be wrong.
 - README: clear PYTHONPATH before installing, not only before the tests; a two-question trial
   before the full run; the full run costs about $1.50, not "well under a dollar".
 
-## 0.1.0 — 2026-11-10
+## 0.1.0 - 2026-11-10
 
 First version.
 

@@ -1,5 +1,3 @@
-"""Parse, chunk, embed and store the corpus."""
-
 import hashlib
 from dataclasses import dataclass
 from typing import Protocol
@@ -28,7 +26,7 @@ class IngestReport:
 
 
 def content_hash(embedding_model: str, chunk: ChunkDraft) -> str:
-    """Changes when the text or the embedding model changes, so stale vectors are never reused."""
+    """Changes with the text or the embedding model, so stale vectors are never reused."""
     return hashlib.sha256(f"{embedding_model}\n{chunk.search_text}".encode()).hexdigest()
 
 

@@ -1,5 +1,3 @@
-"""`policy-assistant doctor`: every check the app depends on, each reported and none fatal."""
-
 from collections.abc import Callable
 
 import httpx

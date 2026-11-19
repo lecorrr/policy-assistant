@@ -1,11 +1,3 @@
-"""Settings and configuration files, all validated when loaded.
-
-Passwords, keys and addresses come from the environment or .env (prefix POLICY_, plus the
-providers' usual OPENAI_API_KEY and ANTHROPIC_API_KEY). The answer models and their prices live in
-config/models.yaml, the roles and demo users in config/users.yaml. A misspelt key in either file,
-or a POLICY_ variable nobody reads, is an error rather than a silent default.
-"""
-
 import os
 import re
 from datetime import date
@@ -35,7 +27,7 @@ _NAME = r"^[a-z0-9][a-z0-9._-]*$"
 
 
 class ConfigError(ValueError):
-    """Configuration that cannot work; the message names the file or variable."""
+    pass
 
 
 class Settings(BaseSettings):
@@ -46,10 +38,10 @@ class Settings(BaseSettings):
     db_host: str = "127.0.0.1"
     db_port: int = Field(5442, ge=1, le=65535)
     db_name: str = "policy"
-    # The admin owns the tables: it creates the schema and writes the corpus.
+    # Owns the tables: creates the schema and writes the corpus.
     db_admin_user: str = "policy_admin"
     db_admin_password: SecretStr | None = None
-    # The app reads as this role, which row-level security applies to.
+    # The app reads as this role; row-level security applies to it.
     db_reader_user: str = "policy_reader"
     db_reader_password: SecretStr | None = None
 
@@ -91,7 +83,7 @@ class Settings(BaseSettings):
     )
     @classmethod
     def _empty_is_unset(cls, value: object) -> object:
-        # `OPENAI_API_KEY=` in .env means "no key", not an empty key.
+        # An empty value in .env means no key.
         return None if value == "" else value
 
     @model_validator(mode="after")
@@ -127,7 +119,7 @@ class Settings(BaseSettings):
         )
 
 
-# --- config/models.yaml ---
+# config/models.yaml
 
 _OPTIONS = {
     "ollama": {"temperature", "reasoning", "num_ctx", "num_predict", "keep_alive"},
@@ -143,7 +135,7 @@ class Price(BaseModel):
 
     input: float = Field(ge=0)
     output: float = Field(ge=0)
-    # Prompts longer than this many tokens pay the long_* prices instead.
+    # Longer prompts pay the long_* prices.
     long_prompt_tokens: int | None = Field(None, gt=0)
     long_input: float | None = Field(None, ge=0)
     long_output: float | None = Field(None, ge=0)
@@ -203,7 +195,7 @@ class ModelsConfig(BaseModel):
         return self
 
 
-# --- config/users.yaml ---
+# config/users.yaml
 
 
 class UserEntry(BaseModel):
@@ -243,8 +235,6 @@ class UsersConfig(BaseModel):
         roles = tuple(sorted({*entry.roles, STAFF_ROLE}))
         return User(login=login, name=entry.name, title=entry.title, roles=roles)
 
-
-# --- loading ---
 
 # POLICY_ variables that Docker Compose reads rather than the app.
 _COMPOSE_ONLY = {"POLICY_ASSISTANT_HOME"}
@@ -298,7 +288,7 @@ def _check_variable_names() -> None:
 
 
 def read_env_file(path: Path) -> dict[str, str]:
-    """KEY=VALUE lines of a .env file; comments and blank lines are skipped."""
+    """Parse KEY=VALUE lines, skipping comments and blank lines."""
     values: dict[str, str] = {}
     if not path.is_file():
         return values

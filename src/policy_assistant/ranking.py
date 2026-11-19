@@ -1,19 +1,13 @@
-"""Combining ranked lists."""
-
 from collections.abc import Sequence
 
-# The usual constant from Cormack et al. (2009): it damps the advantage of the very top ranks.
+# Standard constant from Cormack et al. (2009).
 RRF_K = 60
 
 
 def reciprocal_rank_fusion(
     rankings: Sequence[Sequence[int]], k: int = RRF_K
 ) -> list[tuple[int, float]]:
-    """Fuses ranked lists of ids into one list of (id, score), best first.
-
-    Each id scores the sum of 1 / (k + rank) over the lists it appears in, ranks counted from 1.
-    Ties keep the order in which ids were first seen, so the result is deterministic.
-    """
+    """Fuse ranked id lists into [(id, score)], best first; score is the sum of 1 / (k + rank)."""
     scores: dict[int, float] = {}
     for ranking in rankings:
         for rank, item in enumerate(ranking, start=1):

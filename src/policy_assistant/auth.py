@@ -1,9 +1,4 @@
-"""Password hashes and signed session tokens, with the standard library only.
-
-A session token is "<login>.<expiry>.<signature>", signed with HMAC-SHA256 under the server's
-secret. Roles are not in the token: they are read from config/users.yaml on every request, so
-changing a user's roles takes effect at once.
-"""
+"""Password hashing and signed session tokens ("<login>.<expiry>.<signature>")."""
 
 import base64
 import hashlib
@@ -51,7 +46,7 @@ class SessionSigner:
         return f"{payload}.{self._sign(payload)}"
 
     def login_of(self, token: str, now: float | None = None) -> str | None:
-        """The login a valid, unexpired token was issued for, else None."""
+        """Return the login of a valid, unexpired token, else None."""
         match = _TOKEN.match(token or "")
         if match is None:
             return None

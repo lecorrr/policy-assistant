@@ -1,9 +1,7 @@
-"""Downloading the law's current text from the Verkhovna Rada's open-data API.
+"""Client for the Rada's open-data API.
 
-The API serves anonymous clients only when the User-Agent is exactly "OpenData"; any other value,
-including one that names this app, gets 403. A refused request is redirected to
-zakon.rada.gov.ua, which robots.txt closes to programs, so redirects are never followed. The
-client names itself in a separate header instead.
+Only User-Agent "OpenData" is served; anything else gets 403 and a redirect to
+zakon.rada.gov.ua, which robots.txt closes to programs, so redirects are not followed.
 """
 
 import hashlib
@@ -19,7 +17,7 @@ TEXT_URL = "https://data.rada.gov.ua/laws/show/{nreg}.txt"
 
 
 class LawDownloadError(RuntimeError):
-    """The text could not be downloaded; the message says what to do instead."""
+    pass
 
 
 def fetch_law_text(nreg: str, *, timeout_s: float = 60, url: str | None = None) -> str:
@@ -45,7 +43,7 @@ def fetch_law_text(nreg: str, *, timeout_s: float = 60, url: str | None = None) 
 
 
 def save_law_text(text: str, path: Path, *, url: str) -> dict:
-    """Writes the text as UTF-8 and a note beside it with where and when it came from."""
+    """Write the text as UTF-8, with a note on where and when it was downloaded."""
     path.parent.mkdir(parents=True, exist_ok=True)
     data = text.encode("utf-8")
     path.write_bytes(data)

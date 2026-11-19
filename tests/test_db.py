@@ -1,5 +1,3 @@
-"""Row-level security and search on a real Postgres with pgvector (PA_TEST_DB=1)."""
-
 import psycopg
 import pytest
 from conftest import CORPUS_DIR, SAMPLE_LAW
@@ -17,7 +15,6 @@ ROLES = {"staff", "sales", "risk", "hr"}
 
 @pytest.fixture(scope="module")
 def stored(database, tmp_path_factory):
-    """The real policies and the sample law, ingested with the hashing embedder."""
     lemmatizer = Lemmatizer()
     db.create_schema(
         database["admin"], database["reader"], dims=DIMS, embedding_model="fake", reset=True
@@ -56,7 +53,7 @@ def search(stored, roles, text):
     )
 
 
-def test_the_reader_is_set_up_safely(stored):
+def test_reader_is_set_up_safely(stored):
     check = db.check_reader(stored["db"]["admin"], stored["db"]["reader"])
     assert check.problems == []
     assert check.rows_without_roles == 0
@@ -65,7 +62,7 @@ def test_the_reader_is_set_up_safely(stored):
     assert check.chunks_by_role["hr"] == 16
 
 
-def test_hr_text_never_reaches_a_sales_search_even_word_for_word(stored):
+def test_hr_text_never_reaches_sales_search_even_verbatim(stored):
     exact = "G2, менеджер з продажу: від 28 000 до 38 000 грн"
     vector_hits, lexical_hits = search(stored, ["staff", "sales"], exact)
     returned = vector_hits + lexical_hits
@@ -75,7 +72,7 @@ def test_hr_text_never_reaches_a_sales_search_even_word_for_word(stored):
     assert any("28 000 до 38 000" in h.body for h in hr_hits[:3])
 
 
-def test_a_section_narrowed_to_hr_is_hidden_inside_a_shared_document(stored):
+def test_section_narrowed_to_hr_is_hidden_inside_shared_document(stored):
     vector_hits, lexical_hits = search(stored, ["staff", "sales"], "код виплати 0142 бонус")
     returned = vector_hits + lexical_hits
     assert any(h.doc_id == "sales-bonus" for h in returned)
@@ -95,14 +92,14 @@ def test_documents_are_listed_by_role(stored):
     assert not ids & {"hr-salary-bands", "sales-bonus", "risk-fraud"}
 
 
-def test_roles_do_not_outlive_the_request_on_a_pooled_connection(stored):
+def test_roles_do_not_outlive_request_on_pooled_connection(stored):
     store = stored["store"]  # one connection, reused
     search(stored, ["staff", "hr"], "оклад")
     with store._pool.connection() as conn:
         assert conn.execute("SELECT count(*) AS n FROM chunks").fetchone()["n"] == 0
 
 
-def test_the_reader_cannot_write(stored):
+def test_reader_cannot_write(stored):
     with psycopg.connect(stored["db"]["reader"]) as conn:
         for statement in (
             "UPDATE chunks SET allowed_roles = '{staff}'",
@@ -115,8 +112,7 @@ def test_the_reader_cannot_write(stored):
             conn.rollback()
 
 
-def test_connecting_as_the_admin_is_caught(stored):
-    """The admin bypasses row-level security; the doctor and the retriever both notice."""
+def test_connecting_as_admin_is_caught(stored):
     check = db.check_reader(stored["db"]["admin"], stored["db"]["admin"])
     assert any("superuser" in problem for problem in check.problems)
     as_admin = db.ReaderStore(stored["db"]["admin"])
@@ -129,7 +125,7 @@ def test_connecting_as_the_admin_is_caught(stored):
         as_admin.close()
 
 
-def test_ingest_reuses_embeddings_and_records_the_embedder(stored):
+def test_ingest_reuses_embeddings_and_records_embedder(stored):
     first = stored["report"]
     assert first.embedded == len(first.chunks) and first.reused == 0
     again = ingest(
@@ -144,7 +140,7 @@ def test_ingest_reuses_embeddings_and_records_the_embedder(stored):
     assert stored["store"].embedding_model() == "fake-hashing"
 
 
-def test_changing_the_vector_size_needs_a_reset(stored):
+def test_changing_vector_size_needs_reset(stored):
     with pytest.raises(db.DatabaseError, match="init-db --reset"):
         db.create_schema(
             stored["db"]["admin"], stored["db"]["reader"], dims=DIMS * 2, embedding_model="x"

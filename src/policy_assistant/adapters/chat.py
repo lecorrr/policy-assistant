@@ -1,5 +1,3 @@
-"""Answer models through LangChain: Ollama on this machine, OpenAI and Anthropic online."""
-
 import time
 from dataclasses import dataclass
 
@@ -8,7 +6,7 @@ from policy_assistant.contracts import Usage
 
 
 class ModelError(RuntimeError):
-    """The model could not be built or did not answer; the message names it."""
+    pass
 
 
 @dataclass(frozen=True)
@@ -27,8 +25,6 @@ def has_credentials(config: AnswerModel, settings: Settings) -> bool:
 
 
 class ChatGenerator:
-    """One configured answer model."""
-
     def __init__(self, name: str, config: AnswerModel, settings: Settings) -> None:
         self.name = name
         self.config = config
@@ -40,7 +36,7 @@ class ChatGenerator:
         started = time.perf_counter()
         try:
             message = self._model.invoke([SystemMessage(system), HumanMessage(user)])
-        except Exception as error:  # each provider raises its own types; name the model and fail
+        except Exception as error:  # providers raise their own exception types
             raise ModelError(
                 f"{self.name} ({self.config.provider} {self.config.model}) failed: "
                 f"{type(error).__name__}: {error}"
@@ -84,7 +80,7 @@ def _build(name: str, config: AnswerModel, settings: Settings):
             raise ModelError(f"{name} needs ANTHROPIC_API_KEY in .env")
         from langchain_anthropic import ChatAnthropic
 
-        # Room for adaptive thinking as well as the answer; only tokens produced are billed.
+        # room for adaptive thinking; only generated tokens are billed
         options.setdefault("max_tokens", 2048)
         return ChatAnthropic(
             model=config.model,

@@ -1,5 +1,3 @@
-"""Answer quality, speed, cost and leaks for one model over the evaluation set."""
-
 import math
 from collections.abc import Callable
 from datetime import UTC, datetime
@@ -28,7 +26,7 @@ class EvaluationAborted(RuntimeError):
 
 
 def evaluation_cases(eval_set: EvalSet) -> list[tuple[str, Question | Injection, str]]:
-    """(kind, item, login): the 50 questions, then each leak user's turn, then the injections."""
+    """(kind, item, login): the questions, then each leak user's turn, then the injections."""
     cases: list[tuple[str, Question | Injection, str]] = [
         ("question", question, question.ask_as) for question in eval_set.questions
     ]
@@ -49,7 +47,7 @@ def evaluate_answers(
 ) -> dict:
     if judge is not None:
         check_judge(judge)
-    # The first call loads a local model into the GPU; it is not measured.
+    # Warm-up: the first call loads a local model and is not measured.
     assistant.ask(users.user(eval_set.questions[0].ask_as), WARM_UP_QUESTION, model=model)
 
     results = []
@@ -200,7 +198,7 @@ def summarize(results: list[dict], eval_set: EvalSet) -> dict:
 
 
 def percentile(values: list[float], pct: float) -> float | None:
-    """Nearest-rank percentile: of 50 values, p95 is the 48th smallest."""
+    """Nearest-rank percentile: p95 of 50 values is the 48th smallest."""
     if not values:
         return None
     ordered = sorted(values)

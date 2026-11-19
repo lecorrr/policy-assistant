@@ -1,5 +1,3 @@
-"""The evaluation set, its scoring, the leak tests and the memo."""
-
 import pytest
 from conftest import CORPUS_DIR, MemoryStore, hit, law_text_path
 
@@ -30,7 +28,7 @@ from policy_assistant.fakes import HashingEmbedder, OverlapReranker
 from policy_assistant.search import Retriever
 
 
-def test_the_shipped_set_has_50_questions_and_53_leak_cases():
+def test_shipped_set_has_50_questions_and_53_leak_cases():
     eval_set = load_eval_set(QUESTIONS_FILE)
     assert len(eval_set.questions) == 50 and len(eval_set.answerable) == 48
     kinds = [kind for kind, _, _ in evaluation_cases(eval_set)]
@@ -41,7 +39,7 @@ def test_the_shipped_set_has_50_questions_and_53_leak_cases():
 
 
 @pytest.mark.skipif(law_text_path() is None, reason="the law's text is not downloaded")
-def test_the_shipped_set_fits_the_corpus(users):
+def test_shipped_set_fits_corpus(users):
     documents = load_corpus(CORPUS_DIR, law_text_path(), set(users.roles))
     problems = check_eval_set(load_eval_set(QUESTIONS_FILE), users, chunk_documents(documents))
     assert problems == []
@@ -90,7 +88,7 @@ def test_question_validation(question, message):
         Question.model_validate(question)
 
 
-def test_load_errors_name_the_file(tmp_path):
+def test_load_errors_include_file_name(tmp_path):
     path = tmp_path / "q.yaml"
     path.write_text("law_edition: x\nquestions: []\n", encoding="utf-8")
     with pytest.raises(EvalSetError, match=r"q\.yaml"):
@@ -163,8 +161,6 @@ def test_check_eval_set_catches_missing_evidence_and_reachable_leaks(users):
 
 
 class ScriptedAssistant:
-    """Answers each question with a fixed text, citing the first excerpt it is given."""
-
     def __init__(self, answers: dict[str, str], hits_for: dict[str, list]) -> None:
         self.answers, self.hits_for, self.calls = answers, hits_for, []
 
@@ -216,8 +212,6 @@ def test_answers_are_scored_and_leaks_detected(users):
 
 
 class ScriptedJudge:
-    """Finds every claim supported; fails like a provider when the message holds `fail_on`."""
-
     name = "judge-model"
 
     def __init__(self, fail_on: str | None = None, broken: bool = False) -> None:
@@ -244,7 +238,7 @@ def answering_assistant() -> ScriptedAssistant:
     )
 
 
-def test_a_judge_that_does_not_work_stops_the_run_before_any_question(users):
+def test_broken_judge_stops_run_before_first_question(users):
     assistant = answering_assistant()
     with pytest.raises(JudgeError, match=r"judge-model.*credit balance"):
         evaluate_answers(
@@ -253,7 +247,7 @@ def test_a_judge_that_does_not_work_stops_the_run_before_any_question(users):
     assert assistant.calls == []
 
 
-def test_judge_failures_during_a_run_are_counted_and_shown(users, capsys):
+def test_judge_failures_during_run_are_counted_and_shown(users, capsys):
     lines = []
     report = evaluate_answers(
         mini_set(),
@@ -344,7 +338,7 @@ def test_retrieval_eval_and_leak_test(lemmatizer, users):
     assert len(lines) == 3 and "leak test" in lines[2].lower()
 
 
-def test_leak_test_fails_when_a_leak_user_gets_the_source(lemmatizer, users):
+def test_leak_test_fails_when_leak_user_gets_source(lemmatizer, users):
     shared = hit(2, "hr-salary-bands", "Оклад G2: від 28 000 до 38 000 грн.", ("hr", "sales"))
     retriever = Retriever(
         MemoryStore([shared], lemmatizer),
@@ -430,7 +424,7 @@ def with_cases(report: dict, wrong: list[str]) -> dict:
     return report
 
 
-def test_memo_calls_a_tie_a_tie_and_picks_everyday_by_speed(models):
+def test_memo_reports_tie_and_picks_everyday_model_by_speed(models):
     # The shape of the first full run: all three 47 / 48, the same miss, search never found it.
     reports = {
         "local": with_cases(fake_report("local", 47 / 48, 14854, 0.0), ["L08"]),
@@ -447,7 +441,7 @@ def test_memo_calls_a_tie_a_tie_and_picks_everyday_by_speed(models):
     assert "L08" in memo and "search did not find" in memo
 
 
-def test_memo_names_a_clear_winner_for_costly_questions(models):
+def test_memo_names_clear_winner_for_costly_questions(models):
     reports = {
         "local": fake_report("local", 40 / 48, 14854, 0.0),
         "gpt-6-luna": fake_report("gpt-6-luna", 47 / 48, 5371, 0.167),
@@ -458,7 +452,7 @@ def test_memo_names_a_clear_winner_for_costly_questions(models):
     assert "Everyday questions: **gpt-6-luna**" in memo  # the only one near the best
 
 
-def test_memo_everyday_pick_skips_a_fast_model_that_costs_too_much(models):
+def test_memo_everyday_pick_skips_fast_model_that_costs_too_much(models):
     reports = {
         "local": fake_report("local", 47 / 48, 14854, 0.0),
         "gpt-6-luna": fake_report("gpt-6-luna", 47 / 48, 5371, 0.167),
@@ -468,7 +462,7 @@ def test_memo_everyday_pick_skips_a_fast_model_that_costs_too_much(models):
     assert "Everyday questions: **gpt-6-luna**" in memo
 
 
-def test_memo_command_keeps_the_reports_it_used_beside_the_memo(tmp_path, capsys):
+def test_memo_command_copies_used_reports_next_to_memo(tmp_path, capsys):
     reports = tmp_path / "reports"
     for name, accuracy, p95, cost in [
         ("local", 47 / 48, 14854, 0.0),
@@ -508,7 +502,7 @@ def test_memo_says_when_not_every_answer_was_judged(models):
     assert row.count("judged") == 1  # complete judging shows just the share
 
 
-def test_memo_states_the_search_it_measured(models):
+def test_memo_describes_measured_search_setup(models):
     report = fake_report("local", 0.9, 5000, 0.0)
     report["retrieval"] = {
         "embedding_model": "bge-m3",
@@ -524,7 +518,7 @@ def test_memo_states_the_search_it_measured(models):
     assert "fused, not reranked" in render_memo({"local": report}, None, models)
 
 
-def test_memo_refuses_a_model_that_leaked(models):
+def test_memo_refuses_model_that_leaked(models):
     memo = render_memo({"local": fake_report("local", 0.9, 5000, 0.0, leaks=2)}, None, models)
     assert "No model passed the leak test" in memo
 

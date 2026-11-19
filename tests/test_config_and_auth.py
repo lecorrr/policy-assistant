@@ -1,5 +1,3 @@
-"""Settings, configuration files, passwords and session tokens."""
-
 import pytest
 import yaml
 from conftest import MODELS_FILE, USERS_FILE, make_settings
@@ -70,7 +68,7 @@ def test_models_file_errors(tmp_path, change, message):
         load_models(write_yaml(tmp_path, data))
 
 
-def test_prices_with_a_long_prompt_tier(models):
+def test_prices_with_long_prompt_tier(models):
     haiku = models.models["claude-haiku-5-5"].price
     assert haiku.cost_usd(3000, 200) == pytest.approx((3000 * 0.10 + 200 * 0.50) / 1e6)
     assert haiku.cost_usd(120_000, 200) == pytest.approx((120_000 * 0.50 + 200 * 2.50) / 1e6)
@@ -102,7 +100,7 @@ def test_missing_and_invalid_yaml_files(tmp_path):
         load_users(bad)
 
 
-def test_demo_passwords_match_the_readme(users):
+def test_demo_passwords_match_readme(users):
     for login, entry in users.users.items():
         assert verify_password(f"demo-{login}", entry.password_hash), login
 

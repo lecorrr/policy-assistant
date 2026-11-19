@@ -1,15 +1,3 @@
-"""Postgres: the schema, row-level security, the corpus writes and the role-scoped reads.
-
-Two database roles. The admin owns the tables, creates the schema and writes the corpus; owners
-are not subject to row-level security. The app reads as the reader role, which is: not a superuser,
-without BYPASSRLS and not the owner, so every read it makes passes the policy
-
-    allowed_roles && app_current_roles()
-
-and app_current_roles() is empty unless the transaction set app.roles. A forgotten setting
-therefore returns nothing rather than everything.
-"""
-
 import math
 import re
 from collections.abc import Iterable, Iterator, Sequence
@@ -29,11 +17,11 @@ _START_HINT = "is Postgres running? `docker compose up -d --wait db` starts it"
 
 
 class DatabaseError(RuntimeError):
-    """The database cannot be reached or is not set up; the message says what to do."""
+    pass
 
 
 def roles_literal(roles: Iterable[str]) -> str:
-    """The text[] literal for app.roles. Only plain role names may reach it."""
+    """Build the text[] literal for app.roles; only plain role names are allowed."""
     names = sorted(set(roles))
     for name in names:
         if not _ROLE.match(name):
@@ -49,8 +37,6 @@ def vector_literal(values: Sequence[float]) -> str:
 
 @dataclass(frozen=True)
 class StoredChunk:
-    """A chunk ready to write: the draft plus everything computed from it."""
-
     draft: ChunkDraft
     lexemes: str  # a tsvector literal
     embedding: str  # a vector literal
@@ -83,9 +69,6 @@ class ReaderCheck:
         return found
 
 
-# --- admin side ---
-
-
 def connect_admin(dsn: str) -> psycopg.Connection:
     try:
         return psycopg.connect(dsn, connect_timeout=10, row_factory=dict_row)
@@ -98,7 +81,7 @@ def connect_admin(dsn: str) -> psycopg.Connection:
 def create_schema(
     admin_dsn: str, reader_dsn: str, *, dims: int, embedding_model: str, reset: bool = False
 ) -> None:
-    """Creates or updates the schema, the reader role and its grants. Safe to run again."""
+    """Create or update the schema, the reader role and its grants. Safe to re-run."""
     reader = conninfo_to_dict(reader_dsn)
     reader_user, reader_password = reader.get("user"), reader.get("password")
     if not reader_user or not reader_password:
@@ -138,7 +121,7 @@ def check_embedding_setup(admin_dsn: str, *, dims: int) -> None:
 
 
 def known_embeddings(admin_dsn: str, content_hashes: list[str]) -> dict[str, str]:
-    """Embeddings already stored for these content hashes, so ingest can skip them."""
+    """Stored embeddings for these content hashes, so ingest can skip them."""
     with connect_admin(admin_dsn) as conn:
         rows = conn.execute(
             "SELECT DISTINCT ON (content_hash) content_hash, embedding::text AS embedding "
@@ -151,7 +134,7 @@ def known_embeddings(admin_dsn: str, content_hashes: list[str]) -> dict[str, str
 def replace_corpus(
     admin_dsn: str, documents: list[Document], chunks: list[StoredChunk], *, embedding_model: str
 ) -> None:
-    """Swaps the stored corpus for this one in one transaction: readers see old or new, not both."""
+    """Replace the corpus in one transaction: readers see old or new, never a mix."""
     ids = [document.id for document in documents]
     with connect_admin(admin_dsn) as conn, conn.transaction():
         conn.execute(
@@ -236,8 +219,6 @@ def check_reader(admin_dsn: str, reader_dsn: str) -> ReaderCheck:
 
 
 class AdminStore:
-    """The admin-side calls ingest needs, bound to one connection string."""
-
     def __init__(self, dsn: str) -> None:
         self.dsn = dsn
 
@@ -250,11 +231,8 @@ class AdminStore:
         replace_corpus(self.dsn, documents, chunks, embedding_model=embedding_model)
 
 
-# --- reader side ---
-
-
 class ReaderStore:
-    """Searches as the reader role, always inside a transaction scoped to one user's roles."""
+    """Searches as the reader role, in a transaction scoped to one user's roles."""
 
     def __init__(self, dsn: str, *, max_size: int = 4, timeout_s: float = 10) -> None:
         self._pool = ConnectionPool(
@@ -283,12 +261,11 @@ class ReaderStore:
         tsquery: str | None,
         limit: int,
     ) -> tuple[list[Hit], list[Hit]]:
-        """(vector hits, full-text hits), each best first, both limited to the user's roles."""
+        """Return (vector hits, full-text hits), best first, limited to the user's roles."""
         vector_hits: list[Hit] = []
         lexical_hits: list[Hit] = []
         with self._scoped(roles) as conn:
-            # Row-level security filters rows after the HNSW scan. Iterative scanning keeps
-            # going until `limit` permitted rows are found instead of returning fewer.
+            # RLS filters after the HNSW scan; iterative scan keeps going until `limit` rows pass.
             conn.execute(
                 "SELECT set_config('hnsw.iterative_scan', 'relaxed_order', true), "
                 "set_config('hnsw.ef_search', %s, true)",
@@ -315,7 +292,6 @@ class ReaderStore:
             conn.execute("SELECT 1")
 
     def embedding_model(self) -> str | None:
-        """The embedder that made the stored vectors, as ingest recorded it."""
         with self._scoped([]) as conn:
             row = conn.execute(
                 "SELECT value FROM schema_info WHERE key = 'embedding_model'"
@@ -327,7 +303,7 @@ class ReaderStore:
         literal = roles_literal(roles)
         try:
             with self._pool.connection() as conn, conn.transaction():
-                # true = local to this transaction: the setting ends with it.
+                # true: local to this transaction
                 conn.execute("SELECT set_config('app.roles', %s, true)", [literal])
                 yield conn
         except PoolTimeout:
@@ -344,7 +320,7 @@ def _connect_reader(dsn: str) -> psycopg.Connection:
 
 
 def _load_pgvector(conn: psycopg.Connection) -> None:
-    # Loading the library first makes set_config('hnsw.*') set the real setting, not a placeholder.
+    # Load pgvector first so set_config('hnsw.*') sets the real setting.
     conn.execute("SELECT '[1]'::vector")
     conn.commit()
 
@@ -455,9 +431,8 @@ SELECT hit.*, d.url FROM (
 ORDER BY hit.distance, hit.id
 """
 
-# Measured on the 48 answerable questions, full text alone: ts_rank found the evidence in its
-# top 5 for 92 % of them with heading words counting double ({D, C, B, A} weights below), 83 % with
-# Postgres' default tenfold weight on headings, and 77 % with ts_rank_cd.
+# Headings count double: on the 48 answerable questions this gave 92 % top-5 recall,
+# vs 83 % with Postgres' default 10x heading weight and 77 % with ts_rank_cd.
 _LEXICAL_SQL = """
 SELECT hit.*, d.url FROM (
     SELECT id, document_id, section, label, heading, body, allowed_roles,

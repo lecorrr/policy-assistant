@@ -1,28 +1,23 @@
-# Answer models. Every model gets the same five excerpts and the same instructions.
-#
-# Prices are US dollars per million tokens, copied from each provider's pricing page on the
-# date below. Update both when a price changes; the memo prints the date.
-#   OpenAI:    https://developers.openai.com/api/docs/pricing
-#   Anthropic: https://platform.claude.com/docs/en/about-claude/pricing
-#
-# options go to the LangChain model as they are; only the names listed in config.py are allowed.
+# Answer models. Prices are USD per million tokens, checked on the date below:
+#   https://developers.openai.com/api/docs/pricing
+#   https://platform.claude.com/docs/en/about-claude/pricing
+# options are passed to the LangChain model; config.py lists the allowed names.
 
 prices_checked: 2026-11-10
 
 default: local
 
-# The models the memo compares, in its column order.
+# compared in the memo, in this order
 memo: [local, gpt-6-luna, claude-haiku-5-5]
 
-# Checks faithfulness during eval-answers. A stronger model than the three in the memo, so no
-# model grades its own answers. Set to null to skip judging.
+# Grades faithfulness in eval-answers; not one of the memo models. null skips it.
 judge: claude-sonnet-5-5
 
 models:
   local:
     provider: ollama
     model: gemma4:12b
-    # Gemma 4 can think before answering; for short cited answers the thinking only adds time.
+    # thinking only adds time for short cited answers
     options: {reasoning: false, temperature: 0, num_ctx: 8192}
     price: {input: 0, output: 0}
     price_source: runs on this machine's GPU
@@ -38,7 +33,7 @@ models:
     provider: anthropic
     model: claude-haiku-5-5
     options: {effort: low}
-    # Prompts over 100,000 tokens cost more; ours are about 3,000.
+    # prompts over 100k tokens cost more; ours are ~3k
     price: {input: 0.10, output: 0.50, long_prompt_tokens: 100000, long_input: 0.50, long_output: 2.50}
     price_source: https://platform.claude.com/docs/en/about-claude/pricing
 

@@ -1,12 +1,10 @@
-"""Embeddings from Ollama's /api/embed."""
-
 from collections.abc import Sequence
 
 import httpx
 
 
 class EmbeddingError(RuntimeError):
-    """Ollama did not return usable embeddings; the message says what to do."""
+    pass
 
 
 class OllamaEmbedder:

@@ -1,8 +1,4 @@
-"""The HTTP API and the static page.
-
-Who the user is comes only from the signed session cookie; their roles come from
-config/users.yaml on every request. Nothing in a request body can widen what search returns.
-"""
+"""Web API and page. The user comes from the signed cookie, roles from users.yaml."""
 
 import logging
 import secrets
@@ -54,7 +50,7 @@ class LoginIn(BaseModel):
 
 
 class AskIn(BaseModel):
-    # Unknown fields are refused, so a client cannot believe it chose its roles.
+    # Unknown fields are refused, so a client can't send its own roles.
     model_config = ConfigDict(extra="forbid")
 
     question: str = Field(min_length=1, max_length=MAX_QUESTION_CHARS)

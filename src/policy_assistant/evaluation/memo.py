@@ -1,17 +1,15 @@
-"""The one-page model-choice memo, rendered from the evaluation reports."""
-
 from policy_assistant.config import ModelsConfig
 
-# One question is about two points of accuracy; models this many questions apart are a tie.
+# One question is about 2 points; models this close are a tie.
 NOISE_QUESTIONS = 2
-# Below this cost per 1,000 questions the price hardly matters, so speed decides.
+# Below this cost per 1,000 questions, speed decides.
 EVERYDAY_COST_LIMIT_USD = 1.0
 
 
 def render_memo(
     answer_reports: dict[str, dict], retrieval: dict | None, models: ModelsConfig
 ) -> str:
-    """answer_reports maps a model name to its latest report, in the memo's order."""
+    """answer_reports maps each model to its latest report, in memo order."""
     names = [name for name in models.memo if name in answer_reports]
     if not names:
         raise ValueError("no answer reports for the memo's models: run `eval-answers` first")
@@ -101,7 +99,6 @@ def render_memo(
 
 
 def _wrong_answers(report: dict) -> set[str]:
-    """Answerable questions the model got wrong, refusals included."""
     return {
         case["id"]
         for case in report.get("cases", [])
@@ -172,7 +169,7 @@ def _recommendations(
 
     local = [name for name in safe if models.models[name].provider == "ollama"]
     for name in local:
-        # Decided on the whole points the memo prints, so the verdict matches the number shown.
+        # Compare the rounded points the memo shows.
         best_accuracy = max(summaries[other]["accuracy"] for other in safe)
         gap = round(100 * (best_accuracy - summaries[name]["accuracy"]))
         if gap <= 10:
@@ -212,7 +209,7 @@ def _search_setup(report: dict) -> str:
 
 
 def _faithfulness_cell(summary: dict) -> str:
-    # Reports from before 0.1.1 carry no judge counts, so their share is shown as it is.
+    # Reports before 0.1.1 have no judge counts.
     answered, errors = summary.get("answered"), summary.get("judge_errors", 0)
     if summary["faithfulness"] is None:
         return f"judge failed on all {answered}" if errors else "not judged"

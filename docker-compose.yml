@@ -10,11 +10,11 @@ services:
       POSTGRES_DB: policy
       POSTGRES_USER: policy_admin
       POSTGRES_PASSWORD: ${POLICY_DB_ADMIN_PASSWORD:?run `policy-assistant setup` first}
-    # Only this machine can connect. 5442 rather than 5432, so it never clashes with another Postgres.
+    # local only; 5442 to avoid clashing with another Postgres
     ports:
       - "127.0.0.1:5442:5432"
     volumes:
-      # Postgres 18 images keep their data in /var/lib/postgresql/18/docker, under this mount.
+      # Postgres 18 images keep data in /var/lib/postgresql/18/docker
       - db-data:/var/lib/postgresql
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U policy_admin -d policy"]
@@ -27,7 +27,7 @@ services:
     profiles: [app]
     build: .
     env_file: .env
-    # The host network reaches Ollama and the database on 127.0.0.1 without exposing either.
+    # reach Ollama and the database on 127.0.0.1 without publishing ports
     network_mode: host
     volumes:
       - ./data:/app/data

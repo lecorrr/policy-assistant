@@ -1,9 +1,4 @@
-"""Text helpers: comparison-friendly normalisation, Ukrainian lemmas and full-text literals.
-
-Postgres has no Ukrainian dictionary, so lemmas come from pymorphy3 here and reach the database as
-ready tsvector and tsquery literals. That keeps search independent of the database's locale and
-text parser, which splits words at apostrophes ("зобов'язання" becomes two words).
-"""
+"""Text helpers. Postgres has no Ukrainian dictionary, so lemmas come from pymorphy3."""
 
 import re
 import unicodedata
@@ -13,7 +8,7 @@ _QUOTES = '«»„“”"'
 _DASHES = "‐‑‒–—―−"
 _SPACES = "    "
 
-# Words that carry no meaning for search, compared after lemmatisation.
+# Stop words, compared after lemmatisation.
 _STOPWORD_TEXT = """
 а або адже але аж б би бо бути в вам вас весь ви від він вона вони воно все всі всього вже
 де для до е є ж же з за зі із й і її їх його к коли котрий лише ми між на над наш не ні о
@@ -26,17 +21,14 @@ STOPWORDS = frozenset(_STOPWORD_TEXT.split())
 _WORD = re.compile(r"[a-z0-9а-яіїєґ]+(?:['-][a-z0-9а-яіїєґ]+)*")
 _NOT_TERM = re.compile(r"[^a-z0-9а-яіїєґ-]")
 _NUMBER = re.compile(r"\d{1,3}(?: \d{3})+(?:[.,]\d+)?|\d+(?:[.,]\d+)?")
-# Postgres keeps at most this many positions per tsvector; later words still count, unpositioned.
+# Postgres keeps at most this many positions per tsvector.
 _MAX_POSITION = 16383
-# Readings kept per ambiguous word; more only adds noise.
+# Readings kept per ambiguous word.
 _MAX_READINGS = 3
 
 
 def normalize(text: str) -> str:
-    """Lower-cases text and gives it one kind of apostrophe, quote, dash and space.
-
-    For comparing evidence and answers, not for display.
-    """
+    """Lowercase and unify apostrophes, quotes, dashes and spaces; for comparison only."""
     text = unicodedata.normalize("NFC", text).casefold()
     text = text.translate(
         {ord(c): "'" for c in _APOSTROPHES}
@@ -48,7 +40,7 @@ def normalize(text: str) -> str:
 
 
 def numbers_in(text: str) -> set[str]:
-    """The numbers written in text, as "28000" or "1.5", whatever the separators."""
+    """Numbers in the text as "28000" or "1.5", whatever the separators."""
     found = set()
     for match in _NUMBER.finditer(normalize(text)):
         found.add(match.group().replace(" ", "").replace(",", "."))
@@ -56,12 +48,7 @@ def numbers_in(text: str) -> set[str]:
 
 
 class Lemmatizer:
-    """Turns Ukrainian text into lemmas for full-text search.
-
-    pymorphy3's Ukrainian dictionary has no word frequencies, so an ambiguous form has several
-    equally likely readings: "пені" is "пеня" or "пен", "гроші" is "гроші" or "гріш". Every reading
-    is kept, on both the document and the question side, so the right one always meets itself.
-    """
+    """Ukrainian lemmas for full-text search; ambiguous forms keep several readings."""
 
     def __init__(self) -> None:
         import pymorphy3  # loads its dictionaries, about 0.1 s
@@ -70,7 +57,6 @@ class Lemmatizer:
         self._cache: dict[str, list[str]] = {}
 
     def lemmas(self, word: str) -> list[str]:
-        """The distinct lemmas of one lower-case word, most usual reading first."""
         cached = self._cache.get(word)
         if cached is None:
             if word.isascii():  # Latin words and digits stay as they are
@@ -83,11 +69,7 @@ class Lemmatizer:
         return cached
 
     def words(self, text: str) -> list[list[str]]:
-        """For each word of text that is not a stop word, its search terms.
-
-        A hyphenated word gives its parts and the joined form, so "ризик-менеджер" matches both
-        "ризикменеджер" and "менеджер". Apostrophes are dropped, so "зобов'язання" is one term.
-        """
+        """Search terms per non-stop word; "ризик-менеджер" gives its parts and the whole."""
         found = []
         for word in _WORD.findall(normalize(text)):
             readings = self.lemmas(word)
@@ -111,13 +93,11 @@ class Lemmatizer:
         return found
 
     def lexemes(self, text: str) -> list[str]:
-        """Every search term of text, in order."""
         return [term for terms in self.words(text) for term in terms]
 
 
 def tsvector_literal(heading_words: list[list[str]], body_words: list[list[str]]) -> str:
-    """A tsvector literal; each word's terms share its position. Heading words are marked A,
-    body words D, so the query can weigh them differently."""
+    """tsvector literal; heading words are weighted A, body words D."""
     positions: dict[str, list[str]] = {}
     for index, terms in enumerate([*heading_words, *body_words], start=1):
         weight = "A" if index <= len(heading_words) else ""
@@ -132,7 +112,7 @@ def tsvector_literal(heading_words: list[list[str]], body_words: list[list[str]]
 
 
 def tsquery_literal(terms: list[str]) -> str | None:
-    """A tsquery matching any of the terms, or None when there are none."""
+    """tsquery matching any of the terms, or None if there are none."""
     unique = list(dict.fromkeys(terms))
     if not unique:
         return None

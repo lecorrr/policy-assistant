@@ -1,12 +1,4 @@
-"""Parses the internal policies in corpus/policies/*.md.
-
-A policy is Markdown with YAML front matter and numbered "## N. Title" sections. The front matter's
-`roles` apply to every section; a section can replace them with a comment on the line under its
-heading:
-
-    ## 4. Нарахування (для відділу персоналу)
-    <!-- roles: hr -->
-"""
+"""Parser for corpus/policies/*.md: YAML front matter and numbered "## N. Title" sections."""
 
 import re
 from datetime import date
@@ -19,7 +11,7 @@ from policy_assistant.contracts import Block, Document, Paragraph
 
 
 class PolicyFormatError(ValueError):
-    """A policy file breaks the format above; the message names the file and line."""
+    pass
 
 
 class PolicyMeta(BaseModel):

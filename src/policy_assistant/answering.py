@@ -1,5 +1,3 @@
-"""From excerpts to an answer with citations, and the Assistant that runs one question."""
-
 import re
 import time
 from dataclasses import dataclass

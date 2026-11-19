@@ -1,5 +1,3 @@
-"""The command line, and the rule that the core imports no I/O libraries."""
-
 import os
 import subprocess
 import sys
@@ -11,7 +9,7 @@ from policy_assistant import __version__, cli
 from policy_assistant.config import PROJECT_ROOT
 
 
-def test_every_command_has_a_handler():
+def test_every_command_has_handler():
     parser = cli.build_parser()
     commands = parser._subparsers._group_actions[0].choices
     without = {"setup", "hash-password"}  # run before settings are loaded
@@ -50,7 +48,7 @@ def test_expected_errors_are_one_line(monkeypatch, capsys):
     assert capsys.readouterr().err.startswith("error: unknown settings POLICY_TOPK")
 
 
-def test_asking_as_an_unknown_user(capsys):
+def test_asking_as_unknown_user(capsys):
     assert cli.main(["ask", "--user", "ghost", "Що?"]) == 1
     assert "no user 'ghost'" in capsys.readouterr().err
 
@@ -64,7 +62,7 @@ def test_check_evals_reports_problems_against_another_law(tmp_path, capsys):
 
 
 @pytest.mark.skipif(law_text_path() is None, reason="the law's text is not downloaded")
-def test_check_evals_passes_on_the_downloaded_law(capsys):
+def test_check_evals_passes_on_downloaded_law(capsys):
     assert cli.main(["check-evals"]) == 0
     assert capsys.readouterr().out.strip().endswith("OK")
 
@@ -79,7 +77,7 @@ def test_doctor_reports_each_failure_and_carries_on(monkeypatch, capsys):
     assert "OK   config:" in out and "evaluation set: 50 questions" in out
 
 
-def test_the_whole_flow_on_stand_ins(database, tmp_path, monkeypatch, capsys):
+def test_whole_flow_with_fake_models(database, tmp_path, monkeypatch, capsys):
     for key, value in database["env"].items():
         monkeypatch.setenv(key, value)
     law = tmp_path / "law.txt"
@@ -134,7 +132,7 @@ IO_LIBRARIES = [
 ]
 
 
-def test_the_core_imports_no_io_library():
+def test_core_imports_no_io_library():
     script = f"""
 import importlib.abc, sys
 class Block(importlib.abc.MetaPathFinder):

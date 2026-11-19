@@ -1,5 +1,3 @@
-"""The evaluation set in evals/questions.yaml, and the checks that keep it honest."""
-
 import re
 from pathlib import Path
 
@@ -25,8 +23,7 @@ class Source(BaseModel):
     evidence: str = Field(min_length=5)
 
     def matches(self, chunk: Hit | ChunkDraft) -> bool:
-        """Whether a chunk is (part of) this source: same document and section, and it
-        contains the evidence text, compared after normalisation."""
+        """Same document and section, and the chunk contains the evidence (normalised)."""
         if chunk.doc_id != self.doc or (self.section is not None and chunk.section != self.section):
             return False
         return normalize(self.evidence) in normalize(chunk.search_text)
@@ -116,15 +113,7 @@ def facts_match(patterns: list[str], text: str) -> bool:
 
 
 def check_eval_set(eval_set: EvalSet, users: UsersConfig, chunks: list[ChunkDraft]) -> list[str]:
-    """Problems that would make a score meaningless, checked against the corpus as chunked:
-
-    - every user named exists;
-    - every source's evidence is in some chunk of that document and section, and its facts can
-      be read from that chunk, so a correct answer is possible;
-    - the asking user can read a chunk with the evidence;
-    - no leak user can read any chunk with the evidence, so a leak test asks for something that
-      really is out of reach.
-    """
+    """Problems that would make the scores meaningless, checked against the chunked corpus."""
     problems = []
     for item in [*eval_set.questions, *eval_set.injections]:
         for login in [item.ask_as, *getattr(item, "leak_as", [])]:
@@ -156,7 +145,7 @@ def check_eval_set(eval_set: EvalSet, users: UsersConfig, chunks: list[ChunkDraf
                 problems.append(f"{question.id}: leak user {login} can read the evidence")
             elsewhere = [c.label for c in readable if facts_match(question.facts, c.search_text)]
             if elsewhere:
-                # Then a matching answer would not prove a leak.
+                # then a matching answer would not prove a leak
                 problems.append(
                     f"{question.id}: leak user {login} can read the facts in {elsewhere[0]}"
                 )

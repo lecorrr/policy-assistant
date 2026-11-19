@@ -1,25 +1,21 @@
-"""Data types shared by every module.
-
-Text is Ukrainian. Times are milliseconds, prices are US dollars per million tokens.
-"""
+"""Shared types. Times are in milliseconds, prices in USD per million tokens."""
 
 from dataclasses import dataclass, field
 
-# Every signed-in user has this role; documents meant for all staff carry it.
+# Every signed-in user has this role.
 STAFF_ROLE = "staff"
 
 
 @dataclass(frozen=True)
 class Paragraph:
     text: str
-    # The numbered part of a law article this paragraph belongs to ("1", "4-1"); None elsewhere.
+    # Law article part ("1", "4-1"); None elsewhere.
     part: str | None = None
 
 
 @dataclass(frozen=True)
 class Block:
-    """One citable unit of a document: a law article, a point of the final provisions, an annex
-    or a policy section. A chunk never spans two blocks."""
+    """One citable unit (law article, annex or policy section); a chunk never spans two."""
 
     section: str  # "15", "IV.3", "Додаток 1", "преамбула" for the law; "2" for a policy section
     title: str  # "Стаття 15. Право споживача на відмову від договору про споживчий кредит"
@@ -39,14 +35,11 @@ class Document:
 
     @property
     def roles(self) -> tuple[str, ...]:
-        """Everyone who may read at least one block, in a stable order."""
         return tuple(sorted({role for block in self.blocks for role in block.roles}))
 
 
 @dataclass(frozen=True)
 class ChunkDraft:
-    """A chunk before it has a vector and a database id."""
-
     doc_id: str
     position: int
     section: str
@@ -62,8 +55,6 @@ class ChunkDraft:
 
 @dataclass(frozen=True)
 class Hit:
-    """A chunk returned by search, readable by the user who searched."""
-
     chunk_id: int
     doc_id: str
     section: str

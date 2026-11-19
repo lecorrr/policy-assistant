@@ -1,21 +1,4 @@
-"""The policy-assistant command.
-
-    setup            write .env with generated passwords and a session secret
-    doctor           check the database, row-level security, Ollama, models, keys and corpus
-    init-db          create or update the schema, the reader role and its grants
-    fetch-law        download the current text of law 1734-VIII from the Rada's open-data API
-    ingest           parse, chunk, embed and store the corpus
-    check-evals      check the evaluation set against the corpus (no database needed)
-    ask              ask one question as a user
-    serve            run the web page and the HTTP API
-    eval-retrieval   recall@5 per search mode and the retrieval leak test
-    eval-answers     answer quality, latency, cost and leaks per model
-    memo             write the model-choice memo, with the reports it uses beside it
-    hash-password    print a password hash for config/users.yaml
-
---fake swaps the embedder, the reranker and the answer model for deterministic stand-ins, so the
-pipeline runs without Ollama, downloads or keys. The database is still the real one.
-"""
+"""Command line for the policy assistant."""
 
 import argparse
 import getpass
@@ -70,7 +53,7 @@ from policy_assistant.wiring import (
 
 MEMO_FILE = PROJECT_ROOT / "docs" / "model-choice-memo.md"
 
-# Failures the commands explain in one line instead of a traceback.
+# Errors reported in one line, without a traceback.
 EXPECTED_ERRORS = (
     ConfigError,
     CorpusError,
@@ -111,9 +94,6 @@ def main(argv: list[str] | None = None) -> int:
         return 1
     except KeyboardInterrupt:
         return 130
-
-
-# --- commands ---
 
 
 def cmd_setup(args) -> int:
@@ -294,7 +274,7 @@ def cmd_eval_retrieval(args, context: Context) -> int:
     if not args.fake and context.settings.reranker != "none":
         print(f"Loading {context.settings.reranker}; the first run downloads about 0.6 GB.")
     services = build_services(context, fake=args.fake, need_generators=False)
-    # A rank per mode for each question: '-' means its evidence was not in the top 5.
+    # Rank per mode; '-' means the evidence was not in the top 5.
     print(f"\nSearching {len(eval_set.answerable)} questions: {', '.join(args.modes)}", flush=True)
     try:
         report = evaluate_retrieval(
@@ -362,7 +342,7 @@ def cmd_eval_answers(args, context: Context) -> int:
             summary = report["summary"]
             _print_summary(name, summary, judge=report["judge"])
             print(f"Report: {path}")
-            # An incomplete judgement is a failed measurement, like a leak.
+            # Incomplete judging fails the run, like a leak.
             failed = failed or not summary["leak_test_passed"] or summary["judge_errors"] > 0
     finally:
         services.close()
@@ -386,7 +366,7 @@ def cmd_memo(args, context: Context) -> int:
     out = args.out or MEMO_FILE
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(memo, encoding="utf-8")
-    # data/ stays out of git, so the reports behind the memo are kept next to it.
+    # data/ is not in git, so the memo's reports are copied next to it.
     kept = {f"answers-{name}": report for name, report in answers.items()}
     if retrieval is not None:
         kept["retrieval"] = retrieval
@@ -434,9 +414,6 @@ def _faithfulness_text(summary: dict, judge: str | None) -> str:
     if errors:
         text += f", {errors} judge error{'' if errors == 1 else 's'}"
     return text + ")"
-
-
-# --- arguments ---
 
 
 def build_parser() -> argparse.ArgumentParser:

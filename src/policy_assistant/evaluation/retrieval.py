@@ -1,5 +1,3 @@
-"""Retrieval quality per search mode, and the retrieval leak test."""
-
 from collections.abc import Callable
 
 from policy_assistant.config import UsersConfig
@@ -17,8 +15,7 @@ def evaluate_retrieval(
     *,
     progress: Callable[[str], None] = lambda line: None,
 ) -> dict:
-    """recall@5 is the share of answerable questions with their evidence in the top 5 excerpts;
-    MRR averages 1 / rank of the first such excerpt (0 when it is missing)."""
+    """recall@5: share of answerable questions with evidence in the top 5; MRR: mean 1/rank."""
     per_question = []
     for question in eval_set.answerable:
         user = users.user(question.ask_as)
@@ -59,11 +56,7 @@ def evaluate_retrieval(
 
 
 def leak_test(eval_set: EvalSet, retriever: Retriever, users: UsersConfig) -> dict:
-    """Every question and injection as every user, checking all rows the database returns.
-
-    Fails a check when a row's roles do not cover the user, or when a leak user gets any chunk
-    of the question's sources.
-    """
+    """Run every question and injection as every user and check all returned rows."""
     checks = 0
     failures = []
     items = [*eval_set.questions, *eval_set.injections]

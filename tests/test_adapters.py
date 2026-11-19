@@ -1,5 +1,3 @@
-"""The adapters against local stand-ins: the Rada API, Ollama, the reranker and chat models."""
-
 import json
 import threading
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -19,8 +17,6 @@ from policy_assistant.corpus import load_law
 
 
 class StandIn:
-    """A local HTTP server whose reply each test sets; it records the requests it gets."""
-
     def __init__(self) -> None:
         self.reply = (200, {"Content-Type": "text/plain"}, b"")
         self.requests: list[dict] = []
@@ -67,10 +63,7 @@ def stand_in():
     server.close()
 
 
-# --- the Rada's open-data API ---
-
-
-def test_law_download_sends_the_open_data_user_agent(stand_in, tmp_path):
+def test_law_download_sends_open_data_user_agent(stand_in, tmp_path):
     stand_in.reply = (200, {"Content-Type": "text/plain; charset=utf-8"}, SAMPLE_LAW.encode())
     text = rada.fetch_law_text("1734-19", url=f"{stand_in.url}/laws/show/1734-19.txt")
     assert text == SAMPLE_LAW
@@ -106,12 +99,9 @@ def test_law_download_failures_say_what_to_do(stand_in, reply, message):
     assert len(stand_in.requests) == 1  # a redirect is never followed
 
 
-def test_law_download_without_a_server():
+def test_law_download_without_server():
     with pytest.raises(rada.LawDownloadError, match="cannot reach"):
         rada.fetch_law_text("x", url="http://127.0.0.1:9/laws.txt", timeout_s=2)
-
-
-# --- Ollama embeddings ---
 
 
 def embed_reply(dims):
@@ -143,22 +133,16 @@ def test_embedding_failures(stand_in):
         OllamaEmbedder("http://127.0.0.1:9", "bge-m3", 8, timeout_s=2).embed(["а"])
 
 
-# --- reranker ---
-
-
-def test_no_reranker_keeps_the_order(tmp_path):
+def test_no_reranker_keeps_order(tmp_path):
     reranker = build_reranker("none", tmp_path)
     assert isinstance(reranker, NoReranker)
     scores = reranker.scores("q", ["a", "b", "c"])
     assert sorted(range(3), key=lambda i: -scores[i]) == [0, 1, 2]
 
 
-def test_an_unknown_reranker_model_is_a_clear_error(tmp_path):
+def test_unknown_reranker_model_is_clear_error(tmp_path):
     with pytest.raises(RerankerError, match="not-a-model"):
         build_reranker("acme/not-a-model", tmp_path / "models")
-
-
-# --- chat models ---
 
 
 def answer_model(provider: str, **options) -> AnswerModel:
@@ -207,7 +191,7 @@ def test_generation_reads_text_blocks_and_usage():
     assert result.elapsed_ms >= 0
 
 
-def test_a_failing_model_names_itself():
+def test_failing_model_names_itself():
     generator = ChatGenerator("local", answer_model("ollama"), make_settings())
 
     class Broken:
@@ -217,9 +201,6 @@ def test_a_failing_model_names_itself():
     generator._model = Broken()
     with pytest.raises(ModelError, match=r"local .*ConnectionError: refused"):
         generator.generate("s", "u")
-
-
-# --- database literals ---
 
 
 def test_role_and_vector_literals_reject_anything_unusual():

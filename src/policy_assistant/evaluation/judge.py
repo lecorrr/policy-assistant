@@ -1,5 +1,3 @@
-"""Faithfulness: the share of an answer's claims that its excerpts support, as judged by a model."""
-
 import json
 import re
 
@@ -58,7 +56,7 @@ def parse_verdict(text: str) -> float | None:
 def judge_faithfulness(
     judge, question: str, answer: str, hits: list[Hit]
 ) -> tuple[float | None, object]:
-    """(score, generation) so the caller can count the judge's tokens."""
+    """Return (score, generation) so the caller can count the judge's tokens."""
     generation = judge.generate(JUDGE_SYSTEM, judge_message(question, answer, hits))
     return parse_verdict(generation.text), generation
 
@@ -76,7 +74,7 @@ _CHECK_EXCERPT = Hit(
 
 
 def check_judge(judge) -> None:
-    """One cheap verdict before a run, so a judge without credit or access stops it at once."""
+    """One cheap verdict before a run, so a judge without credit fails fast."""
     try:
         judge_faithfulness(
             judge, "Скільки триває відпустка?", "14 календарних днів [1].", [_CHECK_EXCERPT]

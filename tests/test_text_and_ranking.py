@@ -1,5 +1,3 @@
-"""Normalisation, lemmas, full-text literals and rank fusion."""
-
 import pytest
 
 from policy_assistant.ranking import reciprocal_rank_fusion
@@ -32,7 +30,7 @@ def test_lexemes_lemmatise_and_drop_stop_words(lemmatizer):
     ]
 
 
-def test_every_reading_of_an_ambiguous_word_is_kept(lemmatizer):
+def test_every_reading_of_ambiguous_word_is_kept(lemmatizer):
     # The dictionary has no frequencies: "пені" may be "пеня" or "пен".
     assert {"пеня", "пен"} <= set(lemmatizer.lexemes("пені"))
     assert "пеня" in lemmatizer.lexemes("пеня")
@@ -59,7 +57,7 @@ def test_latin_words_and_digits_pass_through(lemmatizer):
 @pytest.mark.parametrize(
     "text", ["'; DROP TABLE chunks; --", "a & b | !c", "назва\\'з\\:двокрапкою", "{}[]()<>"]
 )
-def test_terms_can_never_break_out_of_a_literal(lemmatizer, text):
+def test_terms_cannot_break_out_of_literal(lemmatizer, text):
     for term in lemmatizer.lexemes(text):
         assert set(term) <= set(
             "abcdefghijklmnopqrstuvwxyz0123456789абвгґдеєжзиіїйклмнопрстуфхцчшщьюя-"

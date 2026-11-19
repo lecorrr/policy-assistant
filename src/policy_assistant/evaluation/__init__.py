@@ -1,5 +1,3 @@
-"""The 50-question evaluation: retrieval quality, answer quality, leak tests and the memo."""
-
 import json
 from datetime import UTC, datetime
 from pathlib import Path
@@ -18,8 +16,7 @@ def write_report(report: dict, directory: Path, prefix: str) -> Path:
 
 
 def latest_report(directory: Path, prefix: str) -> dict | None:
-    """The newest report written with this prefix; names sort by their time stamp."""
-    # Digits right after the prefix, so "answers-gpt-6-luna" never picks "answers-gpt-6-luna-mini".
+    # Digits must follow the prefix, so "answers-gpt-6-luna" skips "...-luna-mini".
     paths = sorted(directory.glob(f"{prefix}-[0-9]*-[0-9]*.json"))
     if not paths:
         return None

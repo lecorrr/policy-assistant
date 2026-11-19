@@ -1,5 +1,3 @@
-"""The retriever and the assistant, on an in-memory store and the stand-in models."""
-
 import pytest
 from conftest import MemoryStore, hit
 
@@ -40,11 +38,8 @@ class ScriptedGenerator:
         return Generation(self.text, Usage(1000, 50), 12.5)
 
 
-# --- retriever ---
-
-
 @pytest.mark.parametrize("mode", ["vector", "lexical", "hybrid", "hybrid+rerank"])
-def test_every_mode_returns_only_rows_the_user_may_read(memory_store, lemmatizer, mode):
+def test_every_mode_returns_only_rows_user_may_read(memory_store, lemmatizer, mode):
     result = retriever(memory_store, lemmatizer).search(
         OLENA.roles, "знизити ставку відпустка оклад", mode=mode
     )
@@ -53,7 +48,7 @@ def test_every_mode_returns_only_rows_the_user_may_read(memory_store, lemmatizer
     assert "hr-salary-bands" not in {h.doc_id for h in result.candidates}
 
 
-def test_vector_only_and_lexical_only_skip_the_other_search(memory_store, lemmatizer):
+def test_vector_only_and_lexical_only_skip_other_search(memory_store, lemmatizer):
     search = retriever(memory_store, lemmatizer)
     search.search(OLENA.roles, "ставка", mode="vector")
     search.search(OLENA.roles, "ставка", mode="lexical")
@@ -61,7 +56,7 @@ def test_vector_only_and_lexical_only_skip_the_other_search(memory_store, lemmat
     assert memory_store.calls[1][1] is False and memory_store.calls[1][2]
 
 
-def test_rerank_orders_by_the_reranker_and_keeps_top_k(memory_store, lemmatizer):
+def test_rerank_orders_by_reranker_and_keeps_top_k(memory_store, lemmatizer):
     result = retriever(memory_store, lemmatizer, top_k=1).search(
         OLENA.roles, "ставку знизити на відсоткові пункти", mode="hybrid+rerank"
     )
@@ -85,7 +80,7 @@ def test_question_vectors_are_cached(memory_store, lemmatizer):
     assert CountingEmbedder.calls == 1
 
 
-def test_a_row_outside_the_users_roles_stops_the_search(lemmatizer):
+def test_row_outside_user_roles_stops_search(lemmatizer):
     class LeakyStore(MemoryStore):  # a database that forgot row-level security
         def search(self, roles, *, vector, tsquery, limit):
             return list(self.hits), []
@@ -100,14 +95,11 @@ def test_unknown_mode_is_refused(memory_store, lemmatizer):
         retriever(memory_store, lemmatizer).search(OLENA.roles, "x", mode="magic")
 
 
-# --- prompt and answer parsing ---
-
-
 def sample_hits() -> list[Hit]:
     return [hit(1, "a", "Перший уривок.", ("staff",)), hit(2, "b", "Другий уривок.", ("staff",))]
 
 
-def test_user_message_numbers_excerpts_and_ends_with_the_question():
+def test_user_message_numbers_excerpts_and_ends_with_question():
     message = build_user_message("Що?", sample_hits())
     assert message.startswith("Уривки:\n\n[1] a, розд. 1\n")
     assert "\n\n[2] b, розд. 1\n" in message
@@ -133,16 +125,13 @@ def test_citations_are_read_and_checked(text, cited, bad):
 @pytest.mark.parametrize(
     "text", [NO_ANSWER, f"  {NO_ANSWER}.", "Немає відповіді", "", "<think>хм</think>"]
 )
-def test_refusals_become_the_fixed_sentence(text):
+def test_refusals_become_fixed_sentence(text):
     parsed = parse_answer(text, excerpt_count=2)
     assert parsed.refused and parsed.text == REFUSAL and parsed.cited == []
 
 
 def test_thinking_is_stripped():
     assert parse_answer("<think>довго</think>Відповідь [1].", 1).text == "Відповідь [1]."
-
-
-# --- the assistant ---
 
 
 def test_assistant_answers_with_citations_usage_and_timings(memory_store, lemmatizer):

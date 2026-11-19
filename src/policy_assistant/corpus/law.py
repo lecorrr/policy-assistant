@@ -1,16 +1,4 @@
-"""Parses the official text of the Consumer Lending law (Закон № 1734-VIII).
-
-The input is the plain text the Rada's open-data API serves for the current edition, one paragraph
-per line. Three things in it need care:
-
-- editorial notes sit in braces, sometimes across several lines: {Статтю 8 доповнено ...};
-- superscripts are flattened: section III¹ reads "Розділ III1" and point 6² of the final
-  provisions reads "62." right after point 6;
-- the final provisions quote amendments to other laws, with their own "Стаття" and "1." lines.
-
-So numbers are read in sequence: a line opens the next article, part or point only if its number
-follows the previous one, either as n + 1 or as a flattened insert such as 62 after 6.
-"""
+"""Parser for the official text of law 1734-VIII as the Rada's open-data API serves it."""
 
 import re
 from dataclasses import dataclass, field
@@ -24,7 +12,7 @@ LAW_TITLE = "Про споживче кредитування"
 LAW_NREG = "1734-19"  # the law's id in the Rada's database
 LAW_URL = f"https://zakon.rada.gov.ua/laws/show/{LAW_NREG}"
 
-# A hyphen appears instead of a superscript in text copied from the website: "Розділ III-1".
+# The website writes superscripts as hyphens: "Розділ III-1".
 _SECTION = re.compile(r"^Розділ\s+([IVXLCІХ]+)(?:-?(\d+))?\.?(?:\s+(.*))?$")
 _ARTICLE = re.compile(r"^Стаття\s+(\d+(?:-\d+)?)\.?(?:\s+(.*))?$")
 _NUMBERED = re.compile(r"^(\d+(?:-\d+)?)\.\s+\S")
@@ -35,7 +23,7 @@ _ROMAN_LOOKALIKES = str.maketrans({"І": "I", "Х": "X"})  # Cyrillic letters us
 
 
 class LawFormatError(ValueError):
-    """The text does not look like the official text of the law."""
+    pass
 
 
 @dataclass
@@ -49,7 +37,7 @@ class _Draft:
 
 
 def read_law_bytes(raw: bytes) -> str:
-    """Decodes the downloaded file: UTF-8 normally, Windows-1251 in older exports."""
+    """UTF-8, or Windows-1251 in older exports."""
     try:
         return raw.decode("utf-8-sig")
     except UnicodeDecodeError:
@@ -154,7 +142,7 @@ def parse_law(text: str, *, source: str, version: str) -> Document:
 
 
 def law_label(section: str, parts: list[str]) -> str:
-    """How a citation names a piece of the law: "Закон № 1734-VIII, ст. 15, ч. 1–3"."""
+    """'Закон № 1734-VIII, ст. 15, ч. 1–3'"""
     base = f"Закон № {LAW_NUMBER}"
     if section == "преамбула":
         return f"{base}, преамбула"
@@ -175,7 +163,7 @@ def _clean_lines(text: str) -> list[str]:
 
 
 def _without_notes(lines: list[str]) -> list[str]:
-    """Drops everything inside braces, including notes that run over several lines."""
+    """Remove {...} notes, including ones that span several lines."""
     kept_lines = []
     depth = 0
     for line in lines:
@@ -198,7 +186,7 @@ def _without_notes(lines: list[str]) -> list[str]:
 
 
 def _section(line: str) -> tuple[str, str] | None:
-    """("III-1", "ВРЕГУЛЮВАННЯ ...") for a section heading, else None."""
+    """('III-1', 'ВРЕГУЛЮВАННЯ ...') for a section heading, else None."""
     match = _SECTION.match(line)
     if match is None:
         return None
@@ -211,11 +199,7 @@ def _section(line: str) -> tuple[str, str] | None:
 
 
 def _next_label(raw: str, last: int | None) -> str | None:
-    """The label for a number that continues the sequence after `last`, else None.
-
-    "7" after 6 is "7"; "62" after 6 is the flattened superscript 6², labelled "6-2", as is
-    "6-2" itself, the form text copied from the website uses.
-    """
+    """Label that continues the numbering after `last`, else None ("62" after 6 is 6², "6-2")."""
     if "-" in raw:
         base = int(raw.partition("-")[0])
         return raw if last is not None and base == last else None
@@ -255,7 +239,7 @@ def _is_header_line(line: str) -> bool:
 
 
 def _is_annex_reference(line: str) -> bool:
-    """The lines under "Додаток N" that only say which law it belongs to."""
+    """Lines under "Додаток N" that only name the law it belongs to."""
     text = normalize(line).strip('"')
     return text in ("до закону україни", normalize(LAW_TITLE))
 

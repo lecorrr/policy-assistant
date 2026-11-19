@@ -1,5 +1,3 @@
-"""Reading the corpus: the law's text and the policy files."""
-
 import json
 from pathlib import Path
 
@@ -11,7 +9,7 @@ __all__ = ["CorpusError", "LawFormatError", "PolicyFormatError", "load_corpus", 
 
 
 class CorpusError(ValueError):
-    """The corpus cannot be read; the message says what to fix."""
+    pass
 
 
 def load_policies(directory: Path, known_roles: set[str]) -> list[Document]:
@@ -31,7 +29,7 @@ def load_law(path: Path) -> Document:
 
 
 def law_version(path: Path) -> str:
-    """The date the law's text was downloaded, from the note `fetch-law` writes beside it."""
+    """Download date of the law text, from the note fetch-law writes."""
     note = path.with_suffix(".json")
     if note.is_file():
         retrieved = json.loads(note.read_text(encoding="utf-8")).get("retrieved_at", "")

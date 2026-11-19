@@ -1,10 +1,6 @@
-# Roles and demo users. All people here are invented.
-#
-# roles lists every role a document or a user may name. Every user also has `staff`, the role
-# of documents meant for all employees. A user's roles decide which chunks search may return.
-#
-# The demo password of each user is "demo-" plus the login, e.g. demo-olena (see README).
-# For a real deployment replace the hashes: `policy-assistant hash-password` prints one.
+# Roles and demo users (all invented). Every user also gets `staff`.
+# Demo password is "demo-" + login, e.g. demo-olena. For real use, replace the hashes
+# with ones from `policy-assistant hash-password`.
 
 roles: [staff, sales, risk, hr]
 

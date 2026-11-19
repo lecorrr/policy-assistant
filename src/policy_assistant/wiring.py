@@ -1,5 +1,3 @@
-"""Building the services the commands and the web app run on, from settings and config."""
-
 from collections.abc import Callable
 from dataclasses import dataclass
 
